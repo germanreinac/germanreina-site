@@ -260,15 +260,22 @@ main { flex: 1; min-height: 0; position: relative; }
   color: var(--star);
 }
 .walk__up {
-  left: max(16px, env(safe-area-inset-left, 0px));
-  top: 14px;
-  padding: 6px 14px;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  top: 50%;
+  transform: translateY(-50%);
+  width: 46px;
+  height: 46px;
+  padding: 0;
   border: 1px solid var(--star-soft);
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--space);
   color: var(--star);
+  font-size: 1.15rem;
+  line-height: 1;
   cursor: pointer;
+  z-index: 3;
 }
+.walk__up:hover { background: var(--pencil); border-color: var(--pencil); color: var(--ink); }
 .walk__end {
   left: 50%;
   bottom: 52px;

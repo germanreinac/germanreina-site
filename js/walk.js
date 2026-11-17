@@ -525,7 +525,9 @@ window.Walk = {
       pawn.position.set(START.x, heightAt(START.x, START.z), START.z);
       pawn.rotation.set(0, 0, 0);
       pawnShadow.visible = true;
-      focus.copy(pawn.position);
+      intro = 1;
+      started = false;
+      focus.copy(pawn.position).add(SIDE); // back to the opening view, name beside the building
       path = []; pending = null; jumpDir = null; fallS = 0; fallTo = 0; fallEnd = false;
       starsFar.position.y = starsNear.position.y = 0;
       setMode("walk");
@@ -635,6 +637,7 @@ window.Walk = {
       n.vz = (dz / d) * 15;
       n.vy = 8;
       n.air = true;
+      n.kicked = true;
       pendingKick = null;
     }
     function updateNpcs(dt) {
@@ -657,7 +660,7 @@ window.Walk = {
         var dx = p.x - pawn.position.x, dz = p.z - pawn.position.z, d = Math.hypot(dx, dz);
         if (mode === "walk" && !n.air && d < 0.95 && Math.abs(p.y - pawn.position.y) < 1.2) {
           if (pendingKick === n) kick(n);
-          else { d = d || 1; n.vx = (dx / d) * 9; n.vz = (dz / d) * 9; }
+          else { d = d || 1; n.vx = (dx / d) * 5.5; n.vz = (dz / d) * 5.5; }
         }
         if (!n.air && Math.hypot(n.vx, n.vz) < 0.05) { // left alone: potter about
           n.wait -= dt;
@@ -690,7 +693,7 @@ window.Walk = {
             n.group.rotation.set(0, 0, 0);
           } else if (p.y < floor - 1.2 || !over) {
             if (p.y < heightAt(n.home.x, n.home.z) - 1.5) n.out = true;
-            if (n.out) n.group.rotation.z += dt * 5;
+            if (n.out && !reduce) n.group.rotation.z += dt * (n.kicked ? 2.2 : 0.9); // a slow tip, not a spin
           }
           if (p.y < -45) { // out of the gallery
             n.gone = 7;
@@ -708,9 +711,12 @@ window.Walk = {
         } else if (over && floor > p.y) { // a step up in the way
           n.vx *= -0.35;
           n.vz *= -0.35;
-        } else { // over the edge
+        } else { // over the edge: it just slips off
           n.air = true;
-          n.vy = 1;
+          n.kicked = false;
+          n.vy = 0;
+          n.vx *= 0.45;
+          n.vz *= 0.45;
           p.x = nx;
           p.z = nz;
         }
