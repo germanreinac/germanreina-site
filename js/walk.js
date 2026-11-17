@@ -1,15 +1,15 @@
 /*
-  The walkable gallery: an isometric stepped block floating in dark space.
+  The walkable gallery: a few platforms floating in dark space, seen in isometric view.
 
-  Four terraces on three levels, joined by four staircases in a loop:
-    front (ground) -> right and left (middle) -> back (top).
-  Art hangs on the risers between levels and on the two walls of the top terrace.
+  The whole thing is described by four short lists below: PLATFORMS, LINKS (stairs and
+  bridges), WALLS and SLOTS (hanging spots). Change those to change the building.
 
   - You land on a view of the whole thing; the first click steps in.
   - Click (tap) a floor or stair to walk there. Click a piece: if you are close it opens,
     if not the figure walks over to it first and it opens on arrival.
-  - Click well outside the block and the figure walks to the edge and jumps off.
-    The fall is a second way to browse: scroll (or drag) down past the projects.
+  - Click out in space and the figure walks to the edge and jumps off, but only where
+    the edge is open. A wall or another platform in the way stops it.
+  - The fall is a second way to browse: projects come up at you out of the depth.
 
   Returns false if WebGL is not available, so main.js can fall back to the flat wall.
 */
@@ -27,57 +27,105 @@ window.Walk = {
 
     var SPACE = 0x17151d, INK = 0x1f1a24, PENCIL = 0xffc52e;
     var SIZES = { wide: [6.4, 4], tall: [4.2, 5.6], square: [4.6, 4.6] };
-    var ART = 0.78;          // pieces are scaled down a little to fit the risers
+    var ART = 0.78;          // pieces are scaled down a little to fit the walls
     var OPEN_RANGE = 4.5;    // how close the figure must be for a click to open a piece
-    var JUMP_MARGIN = 2.5;   // a click this far outside the block means "jump off"
-    var S = 15;              // side of one terrace
-    var H = 5;               // height of one level
-    var BASE = 1.4;          // how far the block continues below the ground terrace
-    var WALL_H = 5.2, WALL_T = 0.4, STEPS = 10, RUN = 7;
+    var JUMP_MARGIN = 2.5;   // a click this far out in space means "jump off"
+    var WALL_T = 0.4, STEPS = 10;
     var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    /* ---- plan. The camera looks from +x +z, so -x and -z are "into the screen". ---- */
-    function levelAt(x, z) { return x >= 0 ? (z >= 0 ? 0 : H) : (z >= 0 ? H : 2 * H); }
-    // Stairs: "run" is the axis you climb along (from RUN down to 0), l0..l1 the strip they occupy across.
-    var STAIRS = [
-      { run: "z", l0: 11, l1: 15, lo: 0 },     // front -> right
-      { run: "x", l0: 11, l1: 15, lo: 0 },     // front -> left
-      { run: "x", l0: -15, l1: -11, lo: H },   // right -> back
-      { run: "z", l0: -15, l1: -11, lo: H }    // left -> back
+    /* ---- the building. The camera looks from +x +z, so -x and -z are "into the screen". ---- */
+    var PLATFORMS = [
+      { name: "entrance", x0: 2, x1: 12, z0: 2, z1: 12, y: 0, thick: 1.4 },
+      { name: "hall", x0: -14, x1: 12, z0: -15, z1: -5, y: 4, thick: 1.4 },
+      { name: "balcony", x0: -14, x1: -6, z0: -1, z1: 7, y: 4, thick: 1 },
+      { name: "tower", x0: -14, x1: -4, z0: -32, z1: -22, y: 9, thick: 15 }
     ];
-    function onStair(st, x, z, pad, ext) {
-      var across = st.run === "z" ? x : z, along = st.run === "z" ? z : x;
-      return across >= st.l0 + pad && across <= st.l1 - pad && along >= -ext && along <= RUN + ext;
-    }
-    function heightAt(x, z) {
-      for (var i = 0; i < STAIRS.length; i++) {
-        var st = STAIRS[i];
-        if (onStair(st, x, z, 0.5, 1.6)) {
-          var along = st.run === "z" ? z : x;
-          return st.lo + Math.max(0, Math.min(1, (RUN - along) / RUN)) * H;
-        }
-      }
-      return levelAt(x, z);
-    }
-    // Hanging spots. axis "z": on a face at fixed z, looking at the camera on +z. axis "x": same for x.
+    // Stairs and bridges. "axis" is the direction you travel; l0..l1 the strip across;
+    // a0 is the end at height lo, a1 the end at height hi (equal heights make a bridge).
+    var LINKS = [
+      { axis: "z", l0: 8, l1: 12, a0: 2, a1: -5, lo: 0, hi: 4 },        // entrance -> hall
+      { axis: "z", l0: -14, l1: -10, a0: -15, a1: -22, lo: 4, hi: 9 },  // hall -> tower
+      { axis: "z", l0: -12, l1: -8, a0: -1, a1: -5, lo: 4, hi: 4 }      // balcony <-> hall
+    ];
+    // Walls stand on the far edges. axis "z": runs along x at a fixed z; axis "x": runs along z.
+    var WALLS = [
+      { axis: "x", at: 2, a: 2, b: 12, base: 0, h: 5 },        // 0 entrance
+      { axis: "z", at: -15, a: -10, b: 12, base: 4, h: 5.2 },  // 1 hall
+      { axis: "x", at: -14, a: -1, b: 7, base: 4, h: 5 },      // 2 balcony
+      { axis: "z", at: -32, a: -14, b: -4, base: 9, h: 5.2 },  // 3 tower
+      { axis: "x", at: -14, a: -32, b: -22, base: 9, h: 5.2 }  // 4 tower
+    ];
+    // Hanging spots: which wall, and where along it. Projects fill them in projects.js order.
     var SLOTS = {
       studio: [
-        // one per ground riser (the stairs hide anything hung closer to them), two per middle riser
-        { axis: "z", at: 0, pos: 4.6, level: 0 }, { axis: "x", at: 0, pos: 4.6, level: 0 },
-        { axis: "x", at: 0, pos: -3.4, level: H }, { axis: "z", at: 0, pos: -3.4, level: H },
-        { axis: "x", at: 0, pos: -8.4, level: H }, { axis: "z", at: 0, pos: -8.4, level: H },
-        { axis: "x", at: -S, pos: -4.4, level: 2 * H }, { axis: "x", at: -S, pos: -10.4, level: 2 * H }
+        { wall: 0, pos: 4.6 }, { wall: 0, pos: 9.5 },
+        { wall: 1, pos: 9.3 }, { wall: 1, pos: 3.8 }, { wall: 1, pos: -1.7 }, { wall: 1, pos: -7.2 },
+        { wall: 2, pos: 3 }
       ],
-      own: [
-        { axis: "z", at: -S, pos: -2.7, level: 2 * H }, { axis: "z", at: -S, pos: -7.4, level: 2 * H },
-        { axis: "z", at: -S, pos: -12.1, level: 2 * H }
-      ]
+      own: [{ wall: 3, pos: -6.6 }, { wall: 4, pos: -24.6 }, { wall: 3, pos: -11.3 }, { wall: 4, pos: -29.3 }]
     };
     var LABELS = [
-      { text: "Games and studio work", x: 1.2, z: 9.6, y: 0 },
-      { text: "Own projects", x: -13.6, z: -1.6, y: 2 * H }
+      { text: "Games and studio work", x: -9.5, z: -7.2, y: 4 },
+      { text: "Own projects", x: -13.4, z: -23.4, y: 9 }
     ];
-    var START = { x: 7.5, z: 7.5 };
+    var START = { x: 8, z: 8.5 };
+    var MIDDLE = new THREE.Vector3(-1, 4, -10);
+
+    function inRect(p, x, z, pad) { return x >= p.x0 + pad && x <= p.x1 - pad && z >= p.z0 + pad && z <= p.z1 - pad; }
+    function onLink(l, x, z, pad, ext) {
+      var across = l.axis === "z" ? x : z, along = l.axis === "z" ? z : x;
+      return across >= l.l0 + pad && across <= l.l1 - pad &&
+        along >= Math.min(l.a0, l.a1) - ext && along <= Math.max(l.a0, l.a1) + ext;
+    }
+    function heightAt(x, z, fallback) {
+      for (var i = 0; i < LINKS.length; i++) {
+        var l = LINKS[i];
+        if (onLink(l, x, z, 0.4, 0)) {
+          var along = l.axis === "z" ? z : x;
+          return l.lo + ((along - l.a0) / (l.a1 - l.a0)) * (l.hi - l.lo);
+        }
+      }
+      for (var j = 0; j < PLATFORMS.length; j++) if (inRect(PLATFORMS[j], x, z, -0.05)) return PLATFORMS[j].y;
+      return fallback || 0;
+    }
+    function overAnything(x, z) {
+      for (var i = 0; i < PLATFORMS.length; i++) if (inRect(PLATFORMS[i], x, z, 0)) return true;
+      for (var j = 0; j < LINKS.length; j++) if (onLink(LINKS[j], x, z, 0, 0)) return true;
+      return false;
+    }
+    function gapTo(x, z) { // 0 when over the building, otherwise roughly how far out in space
+      var best = Infinity;
+      PLATFORMS.forEach(function (r) {
+        var dx = Math.max(r.x0 - x, 0, x - r.x1), dz = Math.max(r.z0 - z, 0, z - r.z1);
+        best = Math.min(best, Math.hypot(dx, dz));
+      });
+      return overAnything(x, z) ? 0 : best;
+    }
+    function hitsWall(x, z, y) {
+      for (var i = 0; i < WALLS.length; i++) {
+        var w = WALLS[i];
+        if (y < w.base - 0.5 || y > w.base + w.h) continue;
+        var across = w.axis === "z" ? z : x, along = w.axis === "z" ? x : z;
+        if (across >= w.at - WALL_T - 0.5 && across <= w.at + 0.5 && along >= w.a - 0.3 && along <= w.b + 0.3) return true;
+      }
+      return false;
+    }
+    // Can the figure jump from here in this direction? Only if the way out is open space:
+    // no wall across it, and no other platform or stair right there to land on.
+    function canJump(from, dir, y) {
+      for (var t = 0.25; t <= 3.5; t += 0.25) {
+        var x = from.x + dir.x * t, z = from.z + dir.z * t;
+        if (hitsWall(x, z, y)) return false;
+        if (!overAnything(x, z)) {
+          for (var u = t; u <= t + 2; u += 0.25) { // and it stays open for a couple of steps
+            var x2 = from.x + dir.x * u, z2 = from.z + dir.z * u;
+            if (overAnything(x2, z2) || hitsWall(x2, z2, y)) return false;
+          }
+          return true;
+        }
+      }
+      return false;
+    }
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setClearColor(SPACE);
@@ -100,8 +148,8 @@ window.Walk = {
     function starLayer(n, size, opacity) {
       var pos = new Float32Array(n * 3);
       for (var i = 0; i < n; i++) {
-        pos[i * 3] = (Math.random() - 0.5) * 190;
-        pos[i * 3 + 1] = (Math.random() - 0.5) * 240;
+        pos[i * 3] = (Math.random() - 0.5) * 200;
+        pos[i * 3 + 1] = (Math.random() - 0.5) * 260;
         pos[i * 3 + 2] = -380;
       }
       var g = new THREE.BufferGeometry();
@@ -114,9 +162,9 @@ window.Walk = {
     }
     var starsFar = starLayer(260, 1, 0.3), starsNear = starLayer(34, 1.5, 0.6);
 
-    /* ---- the block: four terraces, stairs, two walls on the top terrace ---- */
+    /* ---- build the solids ---- */
     var solid = []; // everything a click can land on
-    var tile = (function () {
+    var tileCanvas = (function () {
       var c = document.createElement("canvas");
       c.width = c.height = 128;
       var g = c.getContext("2d");
@@ -125,38 +173,40 @@ window.Walk = {
       g.strokeStyle = "rgba(31,26,36,0.08)";
       g.lineWidth = 2;
       g.strokeRect(0, 0, 128, 128);
-      var t = new THREE.CanvasTexture(c);
-      t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(S / 2.5, S / 2.5);
-      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-      return t;
+      return c;
     })();
-    var faceX = flat(0xe9ebe6), faceZ = flat(0xd3d8d4), topPlain = flat(0xf5f5f1);
-    var topTile = new THREE.MeshBasicMaterial({ map: tile });
+    var faceX = flat(0xe9ebe6), faceZ = flat(0xd3d8d4), under = flat(0xb9c0bd), topPlain = flat(0xf5f5f1);
     function box(x0, x1, y0, y1, z0, z1, top) {
       var m = new THREE.Mesh(
         new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0),
-        [faceX, faceX, top, faceZ, faceZ, faceZ]
+        [faceX, faceX, top, under, faceZ, faceZ]
       );
       m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
       scene.add(m);
       solid.push(m);
       return m;
     }
-    box(0, S, -BASE, 0, 0, S, topTile);          // front, ground level
-    box(0, S, -BASE, H, -S, 0, topTile);         // right, middle level
-    box(-S, 0, -BASE, H, 0, S, topTile);         // left, middle level
-    box(-S, 0, -BASE, 2 * H, -S, 0, topTile);    // back, top level
-    STAIRS.forEach(function (st) {
-      for (var i = 0; i < STEPS; i++) {
-        var a1 = RUN - (i * RUN) / STEPS, a0 = RUN - ((i + 1) * RUN) / STEPS;
-        var y1 = st.lo + ((i + 1) * H) / STEPS;
-        if (st.run === "z") box(st.l0, st.l1, st.lo, y1, a0, a1, topPlain);
-        else box(a0, a1, st.lo, y1, st.l0, st.l1, topPlain);
+    PLATFORMS.forEach(function (p) {
+      var t = new THREE.CanvasTexture(tileCanvas);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set((p.x1 - p.x0) / 2.5, (p.z1 - p.z0) / 2.5);
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      box(p.x0, p.x1, p.y - p.thick, p.y, p.z0, p.z1, new THREE.MeshBasicMaterial({ map: t }));
+    });
+    LINKS.forEach(function (l) {
+      var n = l.hi === l.lo ? 1 : STEPS;
+      for (var i = 0; i < n; i++) {
+        var s0 = l.a0 + ((l.a1 - l.a0) * i) / n, s1 = l.a0 + ((l.a1 - l.a0) * (i + 1)) / n;
+        var top = n === 1 ? l.lo : l.lo + ((l.hi - l.lo) * (i + 1)) / n;
+        var a = Math.min(s0, s1), b = Math.max(s0, s1);
+        if (l.axis === "z") box(l.l0, l.l1, top - 0.9, top, a, b, topPlain);
+        else box(a, b, top - 0.9, top, l.l0, l.l1, topPlain);
       }
     });
-    box(-S, 0, 2 * H, 2 * H + WALL_H, -S - WALL_T, -S, topPlain);
-    box(-S - WALL_T, -S, 2 * H, 2 * H + WALL_H, -S - WALL_T, 0, topPlain);
+    WALLS.forEach(function (w) {
+      if (w.axis === "z") box(w.a, w.b, w.base, w.base + w.h, w.at - WALL_T, w.at, topPlain);
+      else box(w.at - WALL_T, w.at, w.base, w.base + w.h, w.a, w.b, topPlain);
+    });
 
     /* ---- helpers ---- */
     function radial(inner, outer) {
@@ -208,7 +258,7 @@ window.Walk = {
       return new THREE.CanvasTexture(c);
     }
 
-    /* ---- pieces on the block, floor labels, and the cards for the fall ---- */
+    /* ---- pieces on the walls, floor labels, and the cards for the fall ---- */
     var pieces = [], cards = [];
     function build() {
       var loader = new THREE.TextureLoader();
@@ -219,16 +269,17 @@ window.Walk = {
         var slots = SLOTS[p.kind] || SLOTS.studio;
         var slot = slots[used[p.kind]++];
         if (!slot) return; // more projects than hanging spots: add a slot above
+        var wall = WALLS[slot.wall];
         var s = SIZES[p.shape] || SIZES.wide, w = s[0] * ART, h = s[1] * ART;
         var face = new THREE.MeshBasicMaterial({ map: p.images[0] ? loader.load(p.images[0]) : placeholder(p, s[0], s[1]) });
         var mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.14), [edge, edge, edge, edge, face, edge]);
         mesh.userData.index = pieces.length;
-        var onZ = slot.axis === "z";
-        var x = onZ ? slot.pos : slot.at + 0.09, z = onZ ? slot.at + 0.09 : slot.pos;
-        mesh.position.set(x, slot.level + 0.35 + h / 2, z);
+        var onZ = wall.axis === "z";
+        var x = onZ ? slot.pos : wall.at + 0.09, z = onZ ? wall.at + 0.09 : slot.pos;
+        mesh.position.set(x, wall.base + 0.35 + h / 2, z);
         mesh.rotation.y = onZ ? 0 : Math.PI / 2;
         scene.add(mesh);
-        pieces.push({ mesh: mesh, project: p, stand: { x: x + (onZ ? 0 : 2.6), z: z + (onZ ? 2.6 : 0) } });
+        pieces.push({ mesh: mesh, project: p, level: wall.base, stand: { x: x + (onZ ? 0 : 2.6), z: z + (onZ ? 2.6 : 0) } });
       });
 
       LABELS.forEach(function (l) {
@@ -248,7 +299,6 @@ window.Walk = {
         m.position.set(l.x + 4.5, l.y + 0.03, l.z);
         scene.add(m);
       });
-      placeCards();
     }
 
     // Fall cards are plain HTML over the canvas: crisp text and real perspective.
@@ -258,12 +308,11 @@ window.Walk = {
       var art = doc.createElement("button");
       art.type = "button";
       art.className = "fcard__art";
-      art.setAttribute("aria-label", "Open " + p.title);
+      art.setAttribute("aria-label", p.title);
       var s = opts.shapes[p.shape] || opts.shapes.wide;
       art.style.setProperty("--ar", s.ar);
       art.style.setProperty("--tone", p.tone);
       art.appendChild(opts.makeFrame(p, p.images[0]));
-      art.addEventListener("click", function () { if (!dragged) opts.onOpen(p.slug); });
       var text = doc.createElement("div");
       text.className = "fcard__text";
       var h = doc.createElement("h3");
@@ -280,7 +329,13 @@ window.Walk = {
       card.appendChild(text);
       card.hidden = true;
       opts.fallLayer.appendChild(card);
-      return { el: card, art: art, text: text, side: i % 2 ? -1 : 1 };
+      var c = { el: card, art: art, text: text, side: i % 2 ? -1 : 1, lift: [0, -1, 1][i % 3], depth: 0 };
+      art.addEventListener("click", function () {
+        if (dragged) return;
+        if (Math.abs(c.depth) < 320) opts.onOpen(p.slug); // in front of you: open it
+        else { glideTo = (i + 1) * FALL_STEP; lastInput = -1; } // still far: come to it
+      });
+      return c;
     }
 
     /* ---- the walker: a plain stand-in until there is a real character ---- */
@@ -291,7 +346,7 @@ window.Walk = {
     head.position.y = 1.32;
     var pawnShadow = shadow(1.6, 1.6);
     pawn.add(body, head, pawnShadow);
-    pawn.position.set(START.x, 0, START.z);
+    pawn.position.set(START.x, heightAt(START.x, START.z), START.z);
     scene.add(pawn);
 
     var marker = new THREE.Mesh(
@@ -302,12 +357,11 @@ window.Walk = {
     scene.add(marker);
 
     /* ---- walking: a grid over the plan, A* between cells ---- */
-    var GX0 = -16, GZ0 = -16, GW = 32, GH = 32, M = 0.6;
+    var GX0 = -16, GZ0 = -34, GW = 30, GH = 48, M = 0.6;
     function walkable(x, z) {
-      for (var i = 0; i < STAIRS.length; i++) if (onStair(STAIRS[i], x, z, 0.9, 1.5)) return true;
-      for (var j = 0; j < STAIRS.length; j++) if (onStair(STAIRS[j], x, z, -0.6, 0)) return false; // no stepping on from the side
-      var qx = x >= 0 ? x : -x, qz = z >= 0 ? z : -z;
-      return qx >= M && qx <= S - M && qz >= M && qz <= S - M;
+      for (var i = 0; i < LINKS.length; i++) if (onLink(LINKS[i], x, z, 0.9, 1.5)) return true;
+      for (var j = 0; j < PLATFORMS.length; j++) if (inRect(PLATFORMS[j], x, z, M)) return true;
+      return false;
     }
     var grid = [];
     for (var gz = 0; gz < GH; gz++) for (var gx = 0; gx < GW; gx++) grid.push(walkable(GX0 + gx + 0.5, GZ0 + gz + 0.5));
@@ -377,22 +431,18 @@ window.Walk = {
     }
 
     /* ---- camera ---- */
-    // mode: "over" whole block, "walk", "drop" (jumped, still near the block), "fall" (scroll gallery)
-    var mode = "over", zoom = 0, aspect = 1, halfW = 10, halfH = 10, pxWorld = 0.03, viewH = 1;
-    var fallS = 0, fallFirst = 0, fallGap = 0, fallMax = 0, fallEnd = false; // the fall is measured in screen pixels
+    // mode: "over" whole building, "walk", "drop" (jumped, still near it), "fall" (scroll gallery)
+    var mode = "over", zoom = 0, aspect = 1, halfW = 10, halfH = 10, pxWorld = 0.03, viewH = 1, viewW = 1;
     function layout() {
-      var w = host.clientWidth || 1;
+      viewW = host.clientWidth || 1;
       viewH = host.clientHeight || 1;
-      aspect = w / viewH;
-      renderer.setSize(w, viewH, false);
-      fallFirst = viewH * 0.8;
-      fallGap = Math.max(viewH * 0.66, aspect < 0.8 ? 560 : 440);
-      fallMax = fallFirst + (projects.length - 1) * fallGap;
+      aspect = viewW / viewH;
+      renderer.setSize(viewW, viewH, false);
       frustum();
     }
     function frustum() {
       var e = zoom * zoom * (3 - 2 * zoom);
-      var far = Math.max(26, 24 * aspect), close = Math.max(15 * aspect, 12);
+      var far = Math.max(22, 25 * aspect), close = Math.max(15 * aspect, 12);
       halfW = far + (close - far) * e;
       halfH = halfW / aspect;
       pxWorld = (2 * halfH) / viewH;
@@ -402,21 +452,30 @@ window.Walk = {
     window.addEventListener("resize", layout);
     layout();
 
+    /* ---- the fall: projects come up out of the depth, one stop of scroll per project ---- */
+    var FALL_STEP = 560;   // pixels of scroll between two projects
+    var FALL_DEPTH = 1.9;  // how many pixels of depth one pixel of scroll moves a card
+    var fallS = 0, fallEnd = false, glideTo = null, lastInput = -1;
+    var fallMax = projects.length * FALL_STEP;
     function placeCards() {
-      if (mode !== "fall") return;
       cards.forEach(function (c, i) {
-        var y = fallFirst + i * fallGap - fallS; // px below the middle of the screen
-        var t = y / viewH;                        // -0.5 top edge, 0.5 bottom edge
-        var show = Math.abs(t) < 1.1;
+        var z = (fallS - (i + 1) * FALL_STEP) * FALL_DEPTH; // 0 = right in front of you, negative = still below
+        c.depth = z;
+        var show = z > -4300 && z < 620;
         if (c.el.hidden === show) c.el.hidden = !show;
         if (!show) return;
-        var turn = Math.max(-1, Math.min(1, t * 1.6));
-        c.el.style.transform = "translate3d(0," + y.toFixed(1) + "px,0)";
-        c.el.style.opacity = Math.max(0, Math.min(1, 1.25 - Math.abs(t) * 1.7)).toFixed(2);
-        if (reduce) return;
-        // the art leans towards the figure and tips as it passes; the text slides at its own speed
-        c.art.style.transform = "rotateY(" + (-c.side * 14).toFixed(1) + "deg) rotateX(" + (-turn * 20).toFixed(1) + "deg)";
-        c.text.style.transform = "translate3d(0," + (y * 0.14).toFixed(1) + "px,0)";
+        var far = Math.max(0, -z), t = Math.min(1, far / 2600);
+        // deeper cards sit lower and further out to their side, and lie tipped back like floors below you
+        var x = c.side * (viewW * 0.03 + far * 0.5);
+        var y = far * 0.3 + c.lift * far * 0.08;
+        var tr = "translate(-50%,-50%) translate3d(" + x.toFixed(1) + "px," + y.toFixed(1) + "px," + z.toFixed(1) + "px)";
+        if (!reduce) tr += " rotateX(" + (t * 52).toFixed(1) + "deg) rotateY(" + (-c.side * (6 + t * 22)).toFixed(1) + "deg) rotateZ(" + (c.side * t * 7).toFixed(1) + "deg)";
+        c.el.style.transform = tr;
+        c.el.style.zIndex = String(5000 + Math.round(z));
+        var dim = 0.45 + 0.55 * Math.max(0, 1 - far / 1200); // cards still below you are dimmer
+        c.el.style.opacity = (z > 0 ? Math.max(0, 1 - z / 520) : Math.min(1, (z + 4300) / 1500) * dim).toFixed(2);
+        c.text.style.opacity = Math.max(0, 1 - Math.abs(z) / 380).toFixed(2);
+        c.art.style.pointerEvents = z > 200 ? "none" : "auto";
       });
     }
 
@@ -425,6 +484,7 @@ window.Walk = {
     var vel = new THREE.Vector3(), fallBase = new THREE.Vector3();
     var ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), downAt = null, lastY = 0, dragged = false;
     var plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitPt = new THREE.Vector3();
+    var clock = new THREE.Clock(), walkT = 0, time = 0;
     function setPtr(e) {
       var r = canvas.getBoundingClientRect();
       ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
@@ -444,8 +504,7 @@ window.Walk = {
     }
     function visit(pc) {
       jumpDir = null;
-      var sameLevel = Math.abs(heightAt(pc.stand.x, pc.stand.z) - pawn.position.y) < 1;
-      if (sameLevel && distTo(pc.stand) <= OPEN_RANGE) { pending = null; path = []; opts.onOpen(pc.project.slug); }
+      if (Math.abs(pc.level - pawn.position.y) < 1 && distTo(pc.stand) <= OPEN_RANGE) { pending = null; path = []; opts.onOpen(pc.project.slug); }
       else { pending = pc; walkTo(pc.stand); }
     }
     function setMode(m) {
@@ -464,14 +523,15 @@ window.Walk = {
     }
     function climbBack() {
       cards.forEach(function (c) { c.el.hidden = true; });
-      pawn.position.set(START.x, 0, START.z);
+      pawn.position.set(START.x, heightAt(START.x, START.z), START.z);
       pawn.rotation.set(0, 0, 0);
       pawnShadow.visible = true;
       focus.copy(pawn.position);
-      path = []; pending = null; jumpDir = null; fallS = 0; fallEnd = false;
+      path = []; pending = null; jumpDir = null; fallS = 0; fallEnd = false; glideTo = null;
       starsFar.position.y = starsNear.position.y = 0;
       setMode("walk");
     }
+    function scrolled(by) { fallS += by; glideTo = null; lastInput = time; }
 
     host.addEventListener("pointerdown", function (e) {
       downAt = [e.clientX, e.clientY];
@@ -481,7 +541,7 @@ window.Walk = {
     host.addEventListener("pointermove", function (e) {
       if (downAt && mode === "fall") { // drag to scroll the fall
         if (Math.abs(e.clientY - downAt[1]) > 6) dragged = true;
-        fallS += lastY - e.clientY;
+        scrolled((lastY - e.clientY) * 1.4);
         lastY = e.clientY;
       }
       if (e.pointerType !== "mouse" || e.target !== canvas) return;
@@ -505,23 +565,27 @@ window.Walk = {
       plane.constant = -pawn.position.y;
       if (!ray.ray.intersectPlane(plane, hitPt)) return;
       walkTo({ x: hitPt.x, z: hitPt.z });
-      var outside = Math.max(Math.abs(hitPt.x), Math.abs(hitPt.z)) - S;
-      if (outside > JUMP_MARGIN && path.length) {
-        var end = path[path.length - 1];
-        var dx = hitPt.x - end.x, dz = hitPt.z - end.z, d = Math.hypot(dx, dz) || 1;
-        jumpDir = { x: dx / d, z: dz / d };
-        marker.material.opacity = 0;
+      if (!path.length || gapTo(hitPt.x, hitPt.z) < JUMP_MARGIN) return;
+      var end = path[path.length - 1];
+      var dx = hitPt.x - end.x, dz = hitPt.z - end.z, d = Math.hypot(dx, dz) || 1;
+      // try straight towards the click, then straight out over whichever edge is nearer that way
+      var tries = [{ x: dx / d, z: dz / d }, { x: dx > 0 ? 1 : -1, z: 0 }, { x: 0, z: dz > 0 ? 1 : -1 }];
+      if (Math.abs(dz) > Math.abs(dx)) tries.push(tries.splice(1, 1)[0]);
+      for (var i = 0; i < tries.length; i++) {
+        if (canJump(end, tries[i], heightAt(end.x, end.z))) { jumpDir = tries[i]; marker.material.opacity = 0; break; }
       }
     });
     host.addEventListener("wheel", function (e) {
       if (mode !== "fall") return;
-      fallS += e.deltaY;
+      scrolled(e.deltaY);
       e.preventDefault();
     }, { passive: false });
     window.addEventListener("keydown", function (e) {
       if (!active() || document.activeElement !== document.body) return;
       if (mode === "fall" && (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " ")) {
-        fallS += (e.key === "ArrowUp" ? -1 : 1) * viewH * 0.4;
+        var stop = Math.round(fallS / FALL_STEP) + (e.key === "ArrowUp" ? -1 : 1);
+        glideTo = Math.max(1, Math.min(projects.length, stop)) * FALL_STEP;
+        lastInput = -1;
         e.preventDefault();
       }
       if (e.key !== "Enter") return;
@@ -533,10 +597,9 @@ window.Walk = {
     function active() { return !host.hidden && host.offsetParent !== null && !opts.isBlocked(); }
 
     /* ---- loop ---- */
-    var clock = new THREE.Clock(), walkT = 0, time = 0;
-    var OVER = new THREE.Vector3(0, 4.5, 0);
-    if (aspect > 1.2) OVER.addScaledVector(rightV, -10); // on wide screens the block sits to the right of the name
-    if (aspect < 0.8) OVER.addScaledVector(upV, 7);      // on tall screens it sits below the name
+    var OVER = MIDDLE.clone().addScaledVector(rightV, -3.9).addScaledVector(upV, 2);
+    if (aspect > 1.2) OVER.addScaledVector(rightV, -11); // on wide screens the building sits to the right of the name
+    if (aspect < 0.8) OVER.addScaledVector(upV, 8);      // on tall screens it sits below the name
     var focus = OVER.clone(), want = new THREE.Vector3(), tmp = new THREE.Vector3();
     function frame() {
       requestAnimationFrame(frame);
@@ -565,18 +628,17 @@ window.Walk = {
           }
           moving = true;
         }
-        if (mode === "walk") pawn.position.y = heightAt(pawn.position.x, pawn.position.z);
+        if (mode === "walk") pawn.position.y = heightAt(pawn.position.x, pawn.position.z, pawn.position.y);
         if (moving && !reduce) walkT += dt * 12;
         body.position.y = 0.55 + Math.abs(Math.sin(walkT)) * 0.09;
         head.position.y = 1.32 + Math.abs(Math.sin(walkT)) * 0.13;
         marker.material.opacity = path.length ? Math.max(0.25, marker.material.opacity - dt * 0.6) : Math.max(0, marker.material.opacity - dt * 2);
-
       }
       if (mode === "walk") { // checked again: the figure may have just jumped
         var best = null, bestD = OPEN_RANGE;
         pieces.forEach(function (pc) {
           var ds = distTo(pc.stand);
-          if (ds < bestD && Math.abs(heightAt(pc.stand.x, pc.stand.z) - pawn.position.y) < 1) { bestD = ds; best = pc; }
+          if (ds < bestD && Math.abs(pc.level - pawn.position.y) < 1) { bestD = ds; best = pc; }
         });
         if (best !== near) { near = best; opts.onNear(near ? near.project : null); }
       }
@@ -585,27 +647,33 @@ window.Walk = {
         vel.y -= 24 * dt;
         pawn.position.addScaledVector(vel, dt);
         pawn.rotation.z += dt * 3;
-        if (pawn.position.y < dropFrom - 26) { // far enough below: the fall becomes the scroll gallery
+        if (pawn.position.y < dropFrom - 30) { // far enough below: the fall becomes the scroll gallery
           fallBase.copy(focus);
           fallS = 0;
+          glideTo = FALL_STEP;
+          lastInput = -1;
           setMode("fall");
         }
       }
 
       if (mode === "fall") {
-        if (!downAt && fallS < fallMax && !reduce) fallS += dt * 34; // keeps drifting down
+        // when you stop scrolling, settle on the nearest project
+        if (!downAt && time - lastInput > 0.3) {
+          var stop = glideTo !== null ? glideTo : Math.max(1, Math.min(projects.length, Math.round(fallS / FALL_STEP))) * FALL_STEP;
+          fallS += (stop - fallS) * (reduce ? 1 : 1 - Math.pow(0.03, dt));
+        }
         fallS = Math.max(0, Math.min(fallMax, fallS));
-        var atEnd = fallS >= fallMax - 1;
+        var atEnd = fallS >= fallMax - 4;
         if (atEnd !== fallEnd) { fallEnd = atEnd; opts.onState(mode, fallEnd); }
-        var drop = fallS * pxWorld; // the same distance in world units, so the scene moves with the cards
+        var drop = fallS * pxWorld * 0.6; // the scene keeps sinking away behind the cards
         want.copy(fallBase).addScaledVector(upV, -drop);
         focus.lerp(want, reduce ? 1 : 1 - Math.pow(0.0001, dt));
         // the figure hangs in the upper part of the screen, tumbling
-        tmp.copy(focus).addScaledVector(upV, halfH * 0.5).addScaledVector(rightV, Math.sin(time * 0.7) * 0.6).addScaledVector(towardV, 6);
+        tmp.copy(focus).addScaledVector(upV, halfH * 0.62).addScaledVector(rightV, Math.sin(time * 0.7) * 0.6).addScaledVector(towardV, 6);
         pawn.position.lerp(tmp, 1 - Math.pow(0.01, dt));
         if (!reduce) pawn.rotation.z = Math.sin(time * 1.6) * 0.7;
-        starsFar.position.y = drop * 0.06;
-        starsNear.position.y = drop * 0.16;
+        starsFar.position.y = drop * 0.08;
+        starsNear.position.y = drop * 0.2;
         placeCards();
       } else {
         if (mode === "over") want.copy(OVER);

@@ -268,7 +268,7 @@
         ? "tap a floor or stair to walk, a piece to visit it, or outside to jump off"
         : "click a floor or stair to walk, a piece to visit it, or outside to jump off",
       drop: "",
-      fall: touch ? "drag to fall past the projects, tap one to open it" : "scroll to fall past the projects, click one to open it"
+      fall: touch ? "drag to fall through the projects, tap one to open it" : "scroll to fall through the projects, click one to open it"
     };
     host.hidden = false;
     var walk = window.Walk.start({

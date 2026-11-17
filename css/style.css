@@ -271,8 +271,9 @@ main { flex: 1; min-height: 0; position: relative; }
 }
 .walk__end {
   left: 50%;
-  bottom: 18%;
+  bottom: 52px;
   transform: translateX(-50%);
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -310,55 +311,49 @@ main { flex: 1; min-height: 0; position: relative; }
 }
 .walk[data-mode="walk"] .walk__blur, .walk[data-mode="drop"] .walk__blur { opacity: 1; }
 
-/* the fall: project cards rising past the figure */
+/* the fall: project cards coming up out of the depth */
 .fall {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  perspective: 1100px;
+  perspective: 900px;
+  perspective-origin: 50% 46%;
 }
 .fcard {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 0;
+  left: 50%;
+  top: 57%;
+  width: min(86vw, 60rem);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(110px, 17vw, 260px);
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  gap: clamp(24px, 4vw, 60px);
   will-change: transform, opacity;
 }
 .fcard--flip { flex-direction: row-reverse; }
 .fcard__art {
   flex: none;
-  width: min(34vw, 30rem, calc(60vh * (var(--ar))));
+  width: min(40vw, 32rem, calc(56vh * (var(--ar))));
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
   pointer-events: auto;
   touch-action: none;
-  transform-style: preserve-3d;
-  will-change: transform;
 }
 .fcard__art .frame {
   width: 100%;
   max-width: none;
   height: auto;
-  box-shadow: 0 40px 70px -30px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 50px 80px -30px rgba(0, 0, 0, 0.85);
 }
 .fcard__art:hover .frame, .fcard__art:focus-visible .frame { transform: scale(1.02); }
 .fcard__art:focus-visible { outline-color: var(--star); }
 .fcard__text {
-  flex: none;
-  width: min(26vw, 21rem);
+  flex: 0 1 20rem;
   min-width: 0;
   color: var(--star-soft);
-  will-change: transform;
 }
 .fcard--flip .fcard__text { text-align: right; }
 .fcard__text h3 {
@@ -373,10 +368,10 @@ main { flex: 1; min-height: 0; position: relative; }
 .fcard__text p { margin: 0; font-size: 1rem; }
 .fcard__text .fcard__meta { font-family: var(--mono); font-size: 0.74rem; color: var(--pencil); }
 @media (max-width: 720px) {
-  .fcard, .fcard--flip { flex-direction: column; align-items: flex-start; gap: 14px; }
-  .fcard--flip { align-items: flex-end; }
-  .fcard__art { width: min(72vw, 22rem, calc(38vh * (var(--ar)))); }
-  .fcard__text { width: min(78vw, 22rem); }
+  .fcard, .fcard--flip { flex-direction: column; align-items: flex-start; gap: 14px; top: 58%; }
+  .fcard--flip .fcard__text { text-align: left; }
+  .fcard__art { width: min(78vw, 24rem, calc(36vh * (var(--ar)))); }
+  .fcard__text { flex: none; width: 100%; }
 }
 
 /* the interactive gallery sits in dark space; the rest of the site stays light */
