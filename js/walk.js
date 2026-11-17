@@ -313,6 +313,10 @@ window.Walk = {
       art.style.setProperty("--ar", s.ar);
       art.style.setProperty("--tone", p.tone);
       art.appendChild(opts.makeFrame(p, p.images[0]));
+      var pill = doc.createElement("span");
+      pill.className = "fcard__pill";
+      pill.textContent = p.title;
+      art.appendChild(pill);
       var text = doc.createElement("div");
       text.className = "fcard__text";
       var h = doc.createElement("h3");

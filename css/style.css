@@ -349,6 +349,20 @@ main { flex: 1; min-height: 0; position: relative; }
   box-shadow: 0 50px 80px -30px rgba(0, 0, 0, 0.85);
 }
 .fcard__art:hover .frame, .fcard__art:focus-visible .frame { transform: scale(1.02); }
+.fcard__art { position: relative; }
+.fcard__art .frame { border-radius: 18px; }
+.fcard__art .frame--empty .frame__title { visibility: hidden; }
+.fcard__pill {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
 .fcard__art:focus-visible { outline-color: var(--star); }
 .fcard__text {
   flex: 0 1 20rem;
