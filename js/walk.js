@@ -150,8 +150,8 @@ window.Walk = {
     function starLayer(n, size, opacity) {
       var pos = new Float32Array(n * 3);
       for (var i = 0; i < n; i++) {
-        pos[i * 3] = (Math.random() - 0.5) * 200;
-        pos[i * 3 + 1] = (Math.random() - 0.5) * 260;
+        pos[i * 3] = (Math.random() - 0.5) * 130;
+        pos[i * 3 + 1] = (Math.random() - 0.5) * 170;
         pos[i * 3 + 2] = -380;
       }
       var g = new THREE.BufferGeometry();
@@ -162,7 +162,7 @@ window.Walk = {
       camera.add(pts);
       return pts;
     }
-    var starsFar = starLayer(260, 1, 0.3), starsNear = starLayer(34, 1.5, 0.6);
+    var starsFar = starLayer(1100, 1.1, 0.6), starsNear = starLayer(150, 1.6, 0.85);
 
     /* ---- build the solids ---- */
     var solid = []; // everything a click can land on
