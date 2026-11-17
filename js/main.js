@@ -261,7 +261,7 @@
     var count = document.getElementById("room-count");
     var hint = document.getElementById("hint");
     var total = projects.length + " projects", thrownOut = 0;
-    function tally() { return total + (thrownOut ? " · " + thrownOut + " thrown out" : ""); }
+    function tally() { return thrownOut ? thrownOut + " thrown out" : ""; }
     var touch = window.matchMedia("(pointer: coarse)").matches;
     var HINTS = {
       over: (touch ? "tap" : "click") + " anywhere to step in",
@@ -280,12 +280,12 @@
       shapes: SHAPES,
       onOpen: openSheet,
       isBlocked: function () { return sheet.open; },
-      onNear: function (p) { count.textContent = p ? p.title + ": click it to open" : tally(); },
+      onNear: function () {},
       onThrown: function (n) { thrownOut = n; count.textContent = tally(); },
       onMove: function (walked) { intro.style.opacity = Math.max(0, 1 - walked / 7).toFixed(2); },
       onState: function (state, atEnd) {
         hint.textContent = HINTS[state];
-        up.hidden = state !== "fall";
+        up.hidden = state !== "fall" || atEnd;
         end.hidden = !(state === "fall" && atEnd);
       }
     });
@@ -294,7 +294,7 @@
     gallery.classList.add("is-space");
     intro.appendChild(el("h1", null, site.name));
     intro.appendChild(el("p", null, site.intro));
-    count.textContent = total;
+    count.textContent = "";
     hint.textContent = HINTS.walk;
     room.hidden = true;
     document.getElementById("fog").hidden = true;

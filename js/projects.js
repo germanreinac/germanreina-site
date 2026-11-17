@@ -12,9 +12,10 @@
 */
 window.SITE = {
   name: "Germán Reina",
-  // Taken from the Bio page in Notion. Replace with whatever you want on the wall.
-  intro:
-    "Visual artist and Art Director from Lanzarote, in the Canary Islands. Working on weird and funny designs is my passion.",
+  // The line under the name. Other lines of yours that would fit here:
+  //   "Creator of the art for OlliOlli World. Artist at Supercell."   (germanreina.com)
+  //   "Creative Vision and Art Direction for Video Games and Animation."   (Notion bio)
+  intro: "Stay creative, stay weird.",
   links: [
     { label: "Art Discipline", url: "https://artdiscipline.com" }
     // Add Instagram, YouTube, Patreon, email here.
