@@ -266,6 +266,13 @@ main { flex: 1; min-height: 0; position: relative; }
   text-align: center;
 }
 
+.walltext .walk__cta {
+  margin-top: 1.4em;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
 /* ---------- index ---------- */
 .index { overflow-y: auto; background: var(--paper); }
 .index__wrap {

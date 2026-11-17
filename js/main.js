@@ -277,6 +277,7 @@
     room.hidden = true;
     document.getElementById("fog").hidden = true;
     var touch = window.matchMedia("(pointer: coarse)").matches;
+    intro.appendChild(el("p", "walk__cta", (touch ? "Tap" : "Click") + " anywhere to step in"));
     document.getElementById("hint").textContent = touch
       ? "tap the floor to walk, tap a piece to visit it"
       : "click the floor to walk, click a piece to visit it";
