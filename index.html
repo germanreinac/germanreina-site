@@ -23,12 +23,16 @@
 
 <main>
   <section class="view gallery" id="view-gallery" aria-label="Gallery">
+    <div class="walk" id="walk" hidden>
+      <div class="walltext walk__intro" id="walk-intro"></div>
+      <div class="walk__end" id="walk-end" hidden>End of the gallery. <a href="#index">See everything as a list</a></div>
+    </div>
     <div class="room" id="room" tabindex="0"></div>
-    <div class="fog" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="fog" id="fog" aria-hidden="true"><i></i><i></i><i></i></div>
     <div class="grain" aria-hidden="true"></div>
     <div class="gallery__foot">
       <span id="room-count"></span>
-      <span class="gallery__hint">scroll or drag →</span>
+      <span class="gallery__hint" id="hint">scroll or drag →</span>
     </div>
   </section>
 
@@ -53,7 +57,9 @@
   <div class="sheet__body" id="sheet-body"></div>
 </dialog>
 <!-- body:end -->
+<script src="js/vendor/three.min.js"></script>
 <script src="js/projects.js"></script>
+<script src="js/walk.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

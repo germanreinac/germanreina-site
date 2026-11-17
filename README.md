@@ -4,7 +4,7 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 Two views of the same projects:
 
-- **Gallery** (`#gallery`): a foggy wall you walk sideways. Display first.
+- **Gallery** (`#gallery`): a foggy 3D gallery you walk through with a small figure (arrows/WASD, scroll, or click the floor). Falls back to a flat side-scrolling wall without WebGL.
 - **Index** (`#index`): a plain list with filters. Straight to the point.
 
 ## Editing content
@@ -18,4 +18,5 @@ To add images, put them in `images/<project-slug>/` and list the paths in that p
 - `index.html`: page shell
 - `css/style.css`: all styling, colour and type tokens at the top
 - `js/projects.js`: content
-- `js/main.js`: gallery, index and project sheet behaviour
+- `js/walk.js`: the walkable 3D gallery (three.js, vendored in `js/vendor/`)
+- `js/main.js`: flat wall fallback, index and project sheet behaviour
