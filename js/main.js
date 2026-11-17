@@ -265,8 +265,8 @@
     var HINTS = {
       over: (touch ? "tap" : "click") + " anywhere to step in",
       walk: touch
-        ? "tap the floor to walk, tap a piece to visit it, tap outside to jump off"
-        : "click the floor to walk, a piece to visit it, or outside to jump off",
+        ? "tap a floor or stair to walk, a piece to visit it, or outside to jump off"
+        : "click a floor or stair to walk, a piece to visit it, or outside to jump off",
       drop: "",
       fall: touch ? "drag to fall past the projects, tap one to open it" : "scroll to fall past the projects, click one to open it"
     };
@@ -274,6 +274,9 @@
     var walk = window.Walk.start({
       host: host,
       projects: projects,
+      fallLayer: document.getElementById("walk-fall"),
+      makeFrame: frame,
+      shapes: SHAPES,
       onOpen: openSheet,
       isBlocked: function () { return sheet.open; },
       onNear: function (p) { count.textContent = p ? p.title + ": click it to open" : total; },

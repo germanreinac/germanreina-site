@@ -4,7 +4,7 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 Two views of the same projects:
 
-- **Gallery** (`#gallery`): an isometric diorama floating in dark space with fog, with an entrance, two rooms (studio work, own projects) and hallways. Click the floor to walk, click a piece to visit it. Click outside the platform and the figure jumps off; the fall is a second way to browse, scrolling down past the projects. The floor plan, walls and hanging spots are plain lists at the top of `js/walk.js`. Falls back to a flat side-scrolling wall without WebGL.
+- **Gallery** (`#gallery`): an isometric stepped block floating in dark space: four terraces on three levels joined by stairs, with art on the risers and on the top walls. Click a floor or stair to walk, click a piece to visit it. Click outside the block and the figure jumps off; the fall is a second way to browse, scrolling down past project cards. The plan, stairs and hanging spots are plain lists at the top of `js/walk.js`. Falls back to a flat side-scrolling wall without WebGL.
 - **Index** (`#index`): a plain list with filters. Straight to the point.
 
 ## Editing content

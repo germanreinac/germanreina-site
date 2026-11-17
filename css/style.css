@@ -295,6 +295,90 @@ main { flex: 1; min-height: 0; position: relative; }
 }
 .walk__up:focus-visible, .walk__end button:focus-visible, .walk__end a:focus-visible { outline-color: var(--star); }
 
+/* soft focus and darkness towards the edges of the view, clear around the figure */
+.walk__blur {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 75% 75% at 50% 50%, rgba(23, 21, 29, 0) 45%, rgba(23, 21, 29, 0.6) 100%);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  -webkit-mask-image: radial-gradient(ellipse 72% 72% at 50% 50%, transparent 52%, #000 100%);
+  mask-image: radial-gradient(ellipse 72% 72% at 50% 50%, transparent 52%, #000 100%);
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+.walk[data-mode="walk"] .walk__blur, .walk[data-mode="drop"] .walk__blur { opacity: 1; }
+
+/* the fall: project cards rising past the figure */
+.fall {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  perspective: 1100px;
+}
+.fcard {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(110px, 17vw, 260px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  will-change: transform, opacity;
+}
+.fcard--flip { flex-direction: row-reverse; }
+.fcard__art {
+  flex: none;
+  width: min(34vw, 30rem, calc(60vh * (var(--ar))));
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.fcard__art .frame {
+  width: 100%;
+  max-width: none;
+  height: auto;
+  box-shadow: 0 40px 70px -30px rgba(0, 0, 0, 0.8);
+}
+.fcard__art:hover .frame, .fcard__art:focus-visible .frame { transform: scale(1.02); }
+.fcard__art:focus-visible { outline-color: var(--star); }
+.fcard__text {
+  flex: none;
+  width: min(26vw, 21rem);
+  min-width: 0;
+  color: var(--star-soft);
+  will-change: transform;
+}
+.fcard--flip .fcard__text { text-align: right; }
+.fcard__text h3 {
+  margin: 0.15em 0 0.3em;
+  font-size: clamp(1.8rem, 3.6vw, 3.2rem);
+  font-weight: 800;
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  color: var(--star);
+  text-wrap: balance;
+}
+.fcard__text p { margin: 0; font-size: 1rem; }
+.fcard__text .fcard__meta { font-family: var(--mono); font-size: 0.74rem; color: var(--pencil); }
+@media (max-width: 720px) {
+  .fcard, .fcard--flip { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .fcard--flip { align-items: flex-end; }
+  .fcard__art { width: min(72vw, 22rem, calc(38vh * (var(--ar)))); }
+  .fcard__text { width: min(78vw, 22rem); }
+}
+
 /* the interactive gallery sits in dark space; the rest of the site stays light */
 .gallery.is-space { background: var(--space); }
 .gallery.is-space .grain { display: none; }
