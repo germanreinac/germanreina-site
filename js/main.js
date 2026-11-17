@@ -260,15 +260,16 @@
     var up = document.getElementById("walk-up");
     var count = document.getElementById("room-count");
     var hint = document.getElementById("hint");
-    var total = projects.length + " projects";
+    var total = projects.length + " projects", thrownOut = 0;
+    function tally() { return total + (thrownOut ? " · " + thrownOut + " thrown out" : ""); }
     var touch = window.matchMedia("(pointer: coarse)").matches;
     var HINTS = {
       over: (touch ? "tap" : "click") + " anywhere to step in",
       walk: touch
-        ? "tap a floor or stair to walk, a piece to visit it, or outside to jump off"
-        : "click a floor or stair to walk, a piece to visit it, or outside to jump off",
+        ? "tap to walk · bump the others to shove them, tap one to throw it · tap outside to jump off"
+        : "click to walk · bump into the others to shove them, click one to throw it · click outside to jump off",
       drop: "",
-      fall: touch ? "drag to fall through the projects, tap one to open it" : "scroll to fall through the projects, click one to open it"
+      fall: touch ? "drag to scroll the projects, tap one to open it" : "scroll down through the projects, click one to open it"
     };
     host.hidden = false;
     var walk = window.Walk.start({
@@ -279,7 +280,8 @@
       shapes: SHAPES,
       onOpen: openSheet,
       isBlocked: function () { return sheet.open; },
-      onNear: function (p) { count.textContent = p ? p.title + ": click it to open" : total; },
+      onNear: function (p) { count.textContent = p ? p.title + ": click it to open" : tally(); },
+      onThrown: function (n) { thrownOut = n; count.textContent = tally(); },
       onMove: function (walked) { intro.style.opacity = Math.max(0, 1 - walked / 7).toFixed(2); },
       onState: function (state, atEnd) {
         hint.textContent = HINTS[state];
@@ -288,12 +290,12 @@
       }
     });
     if (!walk) { host.hidden = true; return false; }
+    window.__walk = walk; // handle for poking at the gallery from the browser console
     gallery.classList.add("is-space");
     intro.appendChild(el("h1", null, site.name));
     intro.appendChild(el("p", null, site.intro));
-    intro.appendChild(el("p", "walk__cta", (touch ? "Tap" : "Click") + " anywhere to step in"));
     count.textContent = total;
-    hint.textContent = HINTS.over;
+    hint.textContent = HINTS.walk;
     room.hidden = true;
     document.getElementById("fog").hidden = true;
     up.addEventListener("click", walk.climbBack);
