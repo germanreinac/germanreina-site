@@ -254,33 +254,47 @@
   function startWalk() {
     if (!window.Walk) return false;
     var host = document.getElementById("walk");
+    var gallery = document.getElementById("view-gallery");
     var intro = document.getElementById("walk-intro");
     var end = document.getElementById("walk-end");
+    var up = document.getElementById("walk-up");
     var count = document.getElementById("room-count");
+    var hint = document.getElementById("hint");
     var total = projects.length + " projects";
+    var touch = window.matchMedia("(pointer: coarse)").matches;
+    var HINTS = {
+      over: (touch ? "tap" : "click") + " anywhere to step in",
+      walk: touch
+        ? "tap the floor to walk, tap a piece to visit it, tap outside to jump off"
+        : "click the floor to walk, a piece to visit it, or outside to jump off",
+      drop: "",
+      fall: touch ? "drag to fall past the projects, tap one to open it" : "scroll to fall past the projects, click one to open it"
+    };
     host.hidden = false;
-    var ok = window.Walk.start({
+    var walk = window.Walk.start({
       host: host,
       projects: projects,
       onOpen: openSheet,
       isBlocked: function () { return sheet.open; },
       onNear: function (p) { count.textContent = p ? p.title + ": click it to open" : total; },
-      onMove: function (walked, atEnd) {
-        intro.style.opacity = Math.max(0, 1 - walked / 7).toFixed(2);
-        end.hidden = !atEnd;
+      onMove: function (walked) { intro.style.opacity = Math.max(0, 1 - walked / 7).toFixed(2); },
+      onState: function (state, atEnd) {
+        hint.textContent = HINTS[state];
+        up.hidden = state !== "fall";
+        end.hidden = !(state === "fall" && atEnd);
       }
     });
-    if (!ok) { host.hidden = true; return false; }
+    if (!walk) { host.hidden = true; return false; }
+    gallery.classList.add("is-space");
     intro.appendChild(el("h1", null, site.name));
     intro.appendChild(el("p", null, site.intro));
+    intro.appendChild(el("p", "walk__cta", (touch ? "Tap" : "Click") + " anywhere to step in"));
     count.textContent = total;
+    hint.textContent = HINTS.over;
     room.hidden = true;
     document.getElementById("fog").hidden = true;
-    var touch = window.matchMedia("(pointer: coarse)").matches;
-    intro.appendChild(el("p", "walk__cta", (touch ? "Tap" : "Click") + " anywhere to step in"));
-    document.getElementById("hint").textContent = touch
-      ? "tap the floor to walk, tap a piece to visit it"
-      : "click the floor to walk, click a piece to visit it";
+    up.addEventListener("click", walk.climbBack);
+    document.getElementById("walk-climb").addEventListener("click", walk.climbBack);
     return true;
   }
 

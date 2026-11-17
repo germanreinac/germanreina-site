@@ -8,6 +8,9 @@
   --ink-soft: #5c5762;
   --pencil: #ffc52e;
   --line: rgba(31, 26, 36, 0.16);
+  --space: #17151d;
+  --star: #eceeea;
+  --star-soft: #a9a8b0;
 
   --display: "Bricolage Grotesque", "Arial Narrow", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
@@ -250,27 +253,60 @@ main { flex: 1; min-height: 0; position: relative; }
   top: 9%;
   pointer-events: none;
 }
-.walk__end {
+.walk__up, .walk__end {
   position: absolute;
-  left: 50%;
-  top: 14%;
-  transform: translateX(-50%);
-  width: max-content;
-  max-width: calc(100% - 32px);
-  padding: 8px 16px;
-  border: 1px solid var(--ink);
-  border-radius: 999px;
-  background: var(--paper);
   font-family: var(--mono);
   font-size: 0.8rem;
-  text-align: center;
+  color: var(--star);
 }
+.walk__up {
+  left: max(16px, env(safe-area-inset-left, 0px));
+  top: 14px;
+  padding: 6px 14px;
+  border: 1px solid var(--star-soft);
+  border-radius: 999px;
+  background: var(--space);
+  color: var(--star);
+  cursor: pointer;
+}
+.walk__end {
+  left: 50%;
+  bottom: 18%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 16px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 12px 18px;
+  border: 1px solid var(--star-soft);
+  border-radius: 14px;
+  background: var(--space);
+}
+.walk__end button {
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pencil);
+  color: var(--ink);
+  cursor: pointer;
+}
+.walk__up:focus-visible, .walk__end button:focus-visible, .walk__end a:focus-visible { outline-color: var(--star); }
 
-.walltext .walk__cta {
+/* the interactive gallery sits in dark space; the rest of the site stays light */
+.gallery.is-space { background: var(--space); }
+.gallery.is-space .grain { display: none; }
+.gallery.is-space .walltext h1 { color: var(--star); }
+.gallery.is-space .walltext p { color: var(--star-soft); }
+.gallery.is-space .gallery__foot { color: var(--star-soft); }
+
+.gallery.is-space .walltext .walk__cta {
   margin-top: 1.4em;
   font-family: var(--mono);
   font-size: 0.85rem;
-  color: var(--ink);
+  color: var(--pencil);
 }
 
 /* ---------- index ---------- */

@@ -1,9 +1,13 @@
 /*
-  The walkable gallery: an isometric diorama floating in fog.
+  The walkable gallery: an isometric diorama floating in dark space, with fog around it.
   An entrance, two rooms (studio work, own projects) and the hallways between them.
-  You land on a view of the whole thing; the first click steps in.
-  Click (tap) the floor to walk. Click a piece: if you are close it opens, if not the
-  figure walks over to it first and it opens on arrival.
+
+  - You land on a view of the whole thing; the first click steps in.
+  - Click (tap) the floor to walk. Click a piece: if you are close it opens, if not the
+    figure walks over to it first and it opens on arrival.
+  - Click well outside the platform and the figure walks to the edge and jumps off.
+    The fall becomes a second way to browse: scroll (or drag) down past the projects.
+
   Returns false if WebGL is not available, so main.js can fall back to the flat wall.
 */
 window.Walk = {
@@ -18,10 +22,12 @@ window.Walk = {
       return false;
     }
 
-    var FOG = 0xdde2e0, INK = 0x1f1a24, PENCIL = 0xffc52e;
+    var SPACE = 0x17151d, INK = 0x1f1a24, PENCIL = 0xffc52e;
     var SIZES = { wide: [6.4, 4], tall: [4.2, 5.6], square: [4.6, 4.6] };
     var OPEN_RANGE = 4.5;      // how close the figure must be for a click to open a piece
-    var CLEAR = 10, FADE = 14; // pieces are clear within CLEAR, veiled by CLEAR + FADE
+    var CLEAR = 9, FADE = 12;  // pieces are clear within CLEAR, veiled by CLEAR + FADE
+    var JUMP_MARGIN = 2.5;     // a click this far outside the floor means "jump off"
+    var FALL_FIRST = 14, FALL_GAP = 10; // spacing of the projects on the way down
     var WALL_H = 6.8, CURB_H = 0.9, WALL_T = 0.4, SLAB = 1.4;
     var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -60,13 +66,39 @@ window.Walk = {
     var CENTER = { x: -6.5, z: -13.5 };
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearColor(FOG);
+    renderer.setClearColor(SPACE);
     host.appendChild(renderer.domElement);
     var canvas = renderer.domElement;
 
     var scene = new THREE.Scene();
-    var camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400);
+    var camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
+    var CAM = new THREE.Vector3(60, 60, 60);
+    camera.position.copy(CAM);
+    camera.lookAt(0, 0, 0);
+    scene.add(camera);
+    // the camera never turns, so "up" and "right" on screen are fixed directions in the world
+    var upV = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    var rightV = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    var towardV = CAM.clone().normalize();
     function flat(c) { return new THREE.MeshBasicMaterial({ color: c }); }
+
+    /* ---- stars: two layers fixed to the camera, they slide at different speeds in the fall ---- */
+    function starLayer(n, size, opacity) {
+      var pos = new Float32Array(n * 3);
+      for (var i = 0; i < n; i++) {
+        pos[i * 3] = (Math.random() - 0.5) * 190;
+        pos[i * 3 + 1] = (Math.random() - 0.5) * 220;
+        pos[i * 3 + 2] = -380;
+      }
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      var pts = new THREE.Points(g, new THREE.PointsMaterial({
+        color: 0xf5f5f1, size: size * renderer.getPixelRatio(), sizeAttenuation: false, transparent: true, opacity: opacity
+      }));
+      camera.add(pts);
+      return pts;
+    }
+    var starsFar = starLayer(320, 1.8, 0.65), starsNear = starLayer(70, 3, 0.9);
 
     /* ---- floor slabs ---- */
     var tile = (function () {
@@ -80,7 +112,7 @@ window.Walk = {
       g.strokeRect(0, 0, 128, 128);
       return c;
     })();
-    var sideX = flat(0xb3bcba), sideZ = flat(0xa3adab), hidden = flat(0xa3adab);
+    var sideX = flat(0x9aa4a3), sideZ = flat(0x818c8c), hiddenM = flat(0x818c8c);
     FLOORS.forEach(function (r) {
       var w = r.x1 - r.x0, d = r.z1 - r.z0;
       var t = new THREE.CanvasTexture(tile);
@@ -88,7 +120,7 @@ window.Walk = {
       t.repeat.set(w / 2, d / 2);
       t.anisotropy = renderer.capabilities.getMaxAnisotropy();
       var top = new THREE.MeshBasicMaterial({ map: t });
-      var m = new THREE.Mesh(new THREE.BoxGeometry(w, SLAB, d), [sideX, hidden, top, hidden, sideZ, hidden]);
+      var m = new THREE.Mesh(new THREE.BoxGeometry(w, SLAB, d), [sideX, hiddenM, top, hiddenM, sideZ, hiddenM]);
       m.position.set((r.x0 + r.x1) / 2, -SLAB / 2, (r.z0 + r.z1) / 2);
       scene.add(m);
     });
@@ -117,7 +149,7 @@ window.Walk = {
       return new THREE.CanvasTexture(c);
     }
     var shadowTex = radial("rgba(31,26,36,0.4)", "rgba(31,26,36,0)");
-    var puffTex = radial("rgba(245,245,241,0.95)", "rgba(245,245,241,0)");
+    var puffTex = radial("rgba(236,239,236,0.95)", "rgba(236,239,236,0)");
     function shadow(w, d) {
       var m = new THREE.Mesh(
         new THREE.PlaneGeometry(w, d),
@@ -155,20 +187,31 @@ window.Walk = {
       return new THREE.CanvasTexture(c);
     }
 
-    /* ---- pieces and floor labels (built once fonts are in) ---- */
-    var pieces = [];
+    /* ---- pieces on the walls, the same pieces again for the fall, floor labels ---- */
+    var pieces = [], fallPieces = [];
+    var FALL_DEPTH = [1, 0.82, 1.12]; // parallax: below 1 is further away (smaller, slower)
     function build() {
       var loader = new THREE.TextureLoader();
       var used = { studio: 0, own: 0 };
-      projects.forEach(function (p) {
+      projects.forEach(function (p, i) {
+        var s = SIZES[p.shape] || SIZES.wide;
+        var tex = p.images[0] ? loader.load(p.images[0]) : placeholder(p, s[0], s[1]);
+
+        var k = FALL_DEPTH[i % FALL_DEPTH.length];
+        var fm = new THREE.Mesh(
+          new THREE.PlaneGeometry(s[0], s[1]),
+          new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: k < 1 ? 0.8 : 1 })
+        );
+        fm.quaternion.copy(camera.quaternion);
+        fm.visible = false;
+        fm.userData.index = fallPieces.length;
+        scene.add(fm);
+        fallPieces.push({ mesh: fm, project: p, k: k, side: i % 2 ? -1 : 1, v: FALL_FIRST + i * FALL_GAP, w: s[0] });
+
         var slots = SLOTS[p.kind] || SLOTS.studio;
         var slot = slots[used[p.kind]++];
         if (!slot) return; // more projects than hanging spots: add a slot above
-        var s = SIZES[p.shape] || SIZES.wide;
-        var face = new THREE.MeshBasicMaterial({
-          map: p.images[0] ? loader.load(p.images[0]) : placeholder(p, s[0], s[1]),
-          transparent: true
-        });
+        var face = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
         var edge = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
         var mesh = new THREE.Mesh(new THREE.BoxGeometry(s[0], s[1], 0.14), [edge, edge, edge, edge, face, edge]);
         mesh.userData.index = pieces.length;
@@ -201,14 +244,16 @@ window.Walk = {
         scene.add(m);
       });
     }
+    var fallMax = FALL_FIRST + (projects.length - 1) * FALL_GAP + 5;
 
     /* ---- the walker: a plain stand-in until there is a real character ---- */
     var pawn = new THREE.Group();
-    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.42, 1.05, 20), flat(INK));
+    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.42, 1.05, 20), flat(0xc98f12));
     body.position.y = 0.55;
     var head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 16), flat(PENCIL));
     head.position.y = 1.32;
-    pawn.add(body, head, shadow(1.6, 1.6));
+    var pawnShadow = shadow(1.6, 1.6);
+    pawn.add(body, head, pawnShadow);
     pawn.position.set(START.x, 0, START.z);
     scene.add(pawn);
 
@@ -220,15 +265,22 @@ window.Walk = {
     marker.position.y = 0.04;
     scene.add(marker);
 
-    /* ---- fog puffs around and below the diorama ---- */
+    /* ---- fog: thicker over the diorama, thin wisps in the space around and below it ---- */
     var puffs = [];
-    for (var i = 0; i < 60; i++) {
-      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, opacity: 0.45, depthWrite: false }));
-      var sc = 9 + Math.random() * 12;
+    for (var i = 0; i < 70; i++) {
+      var over = i % 2 === 0;
+      var sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: puffTex, transparent: true, opacity: over ? 0.2 : 0.045, depthWrite: false
+      }));
+      var sc = over ? 8 + Math.random() * 9 : 12 + Math.random() * 14;
       sp.scale.set(sc, sc * 0.55, 1);
-      var below = i % 3 !== 0;
-      sp.position.set(CENTER.x + (Math.random() - 0.5) * 70, below ? -2 - Math.random() * 9 : 1 + Math.random() * 3, CENTER.z + (Math.random() - 0.5) * 70);
-      sp.userData.v = (Math.random() - 0.5) * 0.5;
+      var spread = over ? 48 : 80;
+      sp.position.set(
+        CENTER.x + (Math.random() - 0.5) * spread,
+        over ? 1 + Math.random() * 4 : -3 - Math.random() * 10,
+        CENTER.z + (Math.random() - 0.5) * spread
+      );
+      sp.userData.v = (Math.random() - 0.5) * 0.6;
       scene.add(sp);
       puffs.push(sp);
     }
@@ -241,6 +293,14 @@ window.Walk = {
         if (x >= r.x0 + M && x <= r.x1 - M && z >= r.z0 + M && z <= r.z1 - M) return true;
       }
       return false;
+    }
+    function offFloorBy(x, z) { // 0 when over a floor, otherwise distance to the nearest floor
+      var best = Infinity;
+      FLOORS.forEach(function (r) {
+        var dx = Math.max(r.x0 - x, 0, x - r.x1), dz = Math.max(r.z0 - z, 0, z - r.z1);
+        best = Math.min(best, Math.hypot(dx, dz));
+      });
+      return best;
     }
     var grid = [];
     for (var gz = 0; gz < GH; gz++) for (var gx = 0; gx < GW; gx++) grid.push(walkable(GX0 + gx + 0.5, GZ0 + gz + 0.5));
@@ -310,7 +370,8 @@ window.Walk = {
     }
 
     /* ---- camera ---- */
-    var aspect = 1, started = false, zoom = 0; // zoom 0 = whole diorama, 1 = following the figure
+    // mode: "over" whole diorama, "walk", "drop" (jumped, still near the platform), "fall" (scroll gallery)
+    var mode = "over", zoom = 0, aspect = 1, halfW = 10, halfH = 10, pxWorld = 0.03;
     function layout() {
       var w = host.clientWidth || 1, h = host.clientHeight || 1;
       aspect = w / h;
@@ -320,25 +381,28 @@ window.Walk = {
     function frustum() {
       var e = zoom * zoom * (3 - 2 * zoom);
       var far = Math.max(31, 25 * aspect), close = Math.max(13 * aspect, 10);
-      var halfW = far + (close - far) * e, halfH = halfW / aspect;
+      halfW = far + (close - far) * e;
+      halfH = halfW / aspect;
+      pxWorld = (2 * halfH) / (host.clientHeight || 1);
       camera.left = -halfW; camera.right = halfW; camera.top = halfH; camera.bottom = -halfH;
       camera.updateProjectionMatrix();
     }
     window.addEventListener("resize", layout);
     layout();
 
-    /* ---- input: click only ---- */
-    var path = [], pending = null, near = null;
-    var ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), downAt = null;
+    /* ---- input ---- */
+    var path = [], pending = null, near = null, jumpDir = null;
+    var vel = new THREE.Vector3(), fallBase = new THREE.Vector3(), fallS = 0, fallEnd = false;
+    var ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), downAt = null, lastY = 0, dragged = false;
     var groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitPt = new THREE.Vector3();
     function setPtr(e) {
       var r = canvas.getBoundingClientRect();
       ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ptr, camera);
     }
-    function hitPiece() {
-      var hits = ray.intersectObjects(pieces.map(function (p) { return p.mesh; }));
-      return hits.length ? pieces[hits[0].object.userData.index] : null;
+    function hit(list) {
+      var hits = ray.intersectObjects(list.map(function (p) { return p.mesh; }));
+      return hits.length ? list[hits[0].object.userData.index] : null;
     }
     function distTo(pt) { return Math.hypot(pt.x - pawn.position.x, pt.z - pawn.position.z); }
     function walkTo(pt) {
@@ -350,67 +414,173 @@ window.Walk = {
       marker.material.opacity = 0.7;
     }
     function visit(pc) {
+      jumpDir = null;
       if (distTo(pc.stand) <= OPEN_RANGE) { pending = null; path = []; opts.onOpen(pc.project.slug); }
       else { pending = pc; walkTo(pc.stand); }
     }
-    canvas.addEventListener("pointerdown", function (e) { downAt = [e.clientX, e.clientY]; });
+    function setMode(m) {
+      mode = m;
+      opts.onState(mode, fallEnd);
+    }
+    function jumpOff(dir) {
+      vel.set(dir.x * 5, 7, dir.z * 5);
+      pawnShadow.visible = false;
+      marker.material.opacity = 0;
+      near = null;
+      opts.onNear(null);
+      setMode("drop");
+    }
+    function climbBack() {
+      fallPieces.forEach(function (f) { f.mesh.visible = false; });
+      pawn.position.set(START.x, 0, START.z);
+      pawn.rotation.set(0, 0, 0);
+      pawnShadow.visible = true;
+      focus.set(START.x, 0, START.z);
+      path = []; pending = null; jumpDir = null; fallS = 0; fallEnd = false;
+      starsFar.position.y = starsNear.position.y = 0;
+      setMode("walk");
+    }
+
+    canvas.addEventListener("pointerdown", function (e) {
+      downAt = [e.clientX, e.clientY];
+      lastY = e.clientY;
+      dragged = false;
+    });
     canvas.addEventListener("pointermove", function (e) {
+      if (downAt && mode === "fall") { // drag to scroll the fall
+        if (Math.abs(e.clientY - downAt[1]) > 6) dragged = true;
+        fallS += (lastY - e.clientY) * pxWorld;
+        lastY = e.clientY;
+      }
       if (e.pointerType !== "mouse") return;
       setPtr(e);
-      canvas.style.cursor = !started || hitPiece() ? "pointer" : "default";
+      var over = mode === "over" || (mode === "walk" && hit(pieces)) || (mode === "fall" && hit(fallPieces));
+      canvas.style.cursor = over ? "pointer" : "default";
     });
+    window.addEventListener("pointerup", function () { downAt = null; });
     canvas.addEventListener("pointerup", function (e) {
-      if (!downAt || Math.abs(e.clientX - downAt[0]) + Math.abs(e.clientY - downAt[1]) > 10) return;
-      if (!started) { started = true; return; } // first click steps in
+      if (!downAt || dragged || Math.abs(e.clientX - downAt[0]) + Math.abs(e.clientY - downAt[1]) > 10) return;
+      if (mode === "over") { setMode("walk"); return; } // first click steps in
       setPtr(e);
-      var pc = hitPiece();
+      if (mode === "fall") {
+        var f = hit(fallPieces);
+        if (f) opts.onOpen(f.project.slug);
+        return;
+      }
+      if (mode !== "walk") return;
+      var pc = hit(pieces);
       if (pc) { visit(pc); return; }
-      if (ray.ray.intersectPlane(groundPlane, hitPt)) { pending = null; walkTo({ x: hitPt.x, z: hitPt.z }); }
+      if (!ray.ray.intersectPlane(groundPlane, hitPt)) return;
+      pending = null;
+      jumpDir = null;
+      walkTo({ x: hitPt.x, z: hitPt.z });
+      if (offFloorBy(hitPt.x, hitPt.z) > JUMP_MARGIN && path.length) {
+        // a click well outside: walk to the edge, then jump towards the click
+        var end = path[path.length - 1];
+        var dx = hitPt.x - end.x, dz = hitPt.z - end.z, d = Math.hypot(dx, dz) || 1;
+        jumpDir = { x: dx / d, z: dz / d };
+        marker.position.x = hitPt.x;
+        marker.position.z = hitPt.z;
+      }
     });
-    window.addEventListener("keydown", function (e) {
-      if (e.key !== "Enter" || !active() || document.activeElement !== document.body) return;
+    canvas.addEventListener("wheel", function (e) {
+      if (mode !== "fall") return;
+      fallS += e.deltaY * 0.03;
       e.preventDefault();
-      if (!started) started = true;
-      else if (near) visit(near);
+    }, { passive: false });
+    window.addEventListener("keydown", function (e) {
+      if (!active() || document.activeElement !== document.body) return;
+      if (mode === "fall" && (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " ")) {
+        fallS += e.key === "ArrowUp" ? -4 : 4;
+        e.preventDefault();
+      }
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (mode === "over") setMode("walk");
+      else if (mode === "walk" && near) visit(near);
     });
 
     function active() { return !host.hidden && host.offsetParent !== null && !opts.isBlocked(); }
 
     /* ---- loop ---- */
-    var clock = new THREE.Clock(), walkT = 0;
-    var CAM = new THREE.Vector3(60, 60, 60), focus = new THREE.Vector3(CENTER.x - (aspect > 1.2 ? 6.5 : 0), 0, CENTER.z + (aspect > 1.2 ? 6.5 : 0)), want = new THREE.Vector3();
+    var clock = new THREE.Clock(), walkT = 0, time = 0;
+    var overShift = aspect > 1.2 ? 6.5 : 0; // on wide screens the diorama sits to the right of the name
+    var focus = new THREE.Vector3(CENTER.x - overShift, 0, CENTER.z + overShift), want = new THREE.Vector3(), tmp = new THREE.Vector3();
     function frame() {
       requestAnimationFrame(frame);
       var dt = Math.min(clock.getDelta(), 0.05);
       if (!active()) return;
+      time += dt;
 
-      if (started && zoom < 1) { zoom = reduce ? 1 : Math.min(1, zoom + dt * 0.7); frustum(); }
+      if (mode !== "over" && zoom < 1) { zoom = reduce ? 1 : Math.min(1, zoom + dt * 0.7); frustum(); }
 
-      var moving = false;
-      if (path.length) {
-        var t = path[0], tx = t.x - pawn.position.x, tz = t.z - pawn.position.z;
-        var dist = Math.sqrt(tx * tx + tz * tz), step = 8 * dt;
-        if (dist <= step) {
-          pawn.position.x = t.x;
-          pawn.position.z = t.z;
-          path.shift();
-          if (!path.length && pending) { var pc = pending; pending = null; opts.onOpen(pc.project.slug); }
-        } else {
-          pawn.position.x += (tx / dist) * step;
-          pawn.position.z += (tz / dist) * step;
+      if (mode === "walk") {
+        var moving = false;
+        if (path.length) {
+          var t = path[0], tx = t.x - pawn.position.x, tz = t.z - pawn.position.z;
+          var dist = Math.sqrt(tx * tx + tz * tz), step = 8 * dt;
+          if (dist <= step) {
+            pawn.position.x = t.x;
+            pawn.position.z = t.z;
+            path.shift();
+            if (!path.length) {
+              if (pending) { var pc = pending; pending = null; opts.onOpen(pc.project.slug); }
+              else if (jumpDir) { var jd = jumpDir; jumpDir = null; jumpOff(jd); }
+            }
+          } else {
+            pawn.position.x += (tx / dist) * step;
+            pawn.position.z += (tz / dist) * step;
+          }
+          moving = true;
         }
-        moving = true;
+        if (moving && !reduce) walkT += dt * 12;
+        body.position.y = 0.55 + Math.abs(Math.sin(walkT)) * 0.09;
+        head.position.y = 1.32 + Math.abs(Math.sin(walkT)) * 0.13;
+        marker.material.opacity = path.length ? Math.max(0.25, marker.material.opacity - dt * 0.6) : Math.max(0, marker.material.opacity - dt * 2);
       }
-      if (moving && !reduce) walkT += dt * 12;
-      body.position.y = 0.55 + Math.abs(Math.sin(walkT)) * 0.09;
-      head.position.y = 1.32 + Math.abs(Math.sin(walkT)) * 0.13;
-      marker.material.opacity = path.length ? Math.max(0.25, marker.material.opacity - dt * 0.6) : Math.max(0, marker.material.opacity - dt * 2);
 
-      var shift = aspect > 1.2 ? 6.5 : 0; // on wide screens the diorama sits to the right of the name
-      if (started) want.set(pawn.position.x, 0, pawn.position.z); else want.set(CENTER.x - shift, 0, CENTER.z + shift);
-      focus.lerp(want, reduce ? 1 : 1 - Math.pow(0.02, dt));
+      if (mode === "drop") {
+        vel.y -= 24 * dt;
+        pawn.position.addScaledVector(vel, dt);
+        pawn.rotation.z += dt * 3;
+        if (pawn.position.y < -20) { // far enough below: the fall becomes the scroll gallery
+          fallBase.copy(focus);
+          fallS = 0;
+          setMode("fall");
+        }
+      }
+
+      if (mode === "fall") {
+        if (!downAt && fallS < fallMax && !reduce) fallS += dt * 1.1; // keeps drifting down
+        fallS = Math.max(0, Math.min(fallMax, fallS));
+        var atEnd = fallS >= fallMax - 0.01;
+        if (atEnd !== fallEnd) { fallEnd = atEnd; opts.onState(mode, fallEnd); }
+        want.copy(fallBase).addScaledVector(upV, -fallS);
+        focus.lerp(want, reduce ? 1 : 1 - Math.pow(0.0005, dt));
+        // the figure hangs in the upper part of the screen, tumbling
+        tmp.copy(focus).addScaledVector(upV, halfH * 0.42).addScaledVector(rightV, Math.sin(time * 0.7) * 0.6).addScaledVector(towardV, 6);
+        pawn.position.lerp(tmp, 1 - Math.pow(0.01, dt));
+        if (!reduce) pawn.rotation.z = Math.sin(time * 1.6) * 0.7;
+        var drop = fallS; // how far we have fallen, in world units
+        fallPieces.forEach(function (f) {
+          var fit = Math.min(2.2, (halfW * 0.75) / 6.4) * f.k;
+          var y = (drop - f.v) * f.k;
+          f.mesh.visible = Math.abs(y) < halfH + 14;
+          f.mesh.scale.set(fit, fit, 1);
+          f.mesh.position.copy(focus)
+            .addScaledVector(upV, y)
+            .addScaledVector(rightV, f.side * halfW * (aspect > 1 ? 0.42 : 0.3))
+            .addScaledVector(towardV, f.k * 4);
+        });
+        starsFar.position.y = drop * 0.05;
+        starsNear.position.y = drop * 0.13;
+      } else {
+        if (mode === "over") want.set(CENTER.x - overShift, 0, CENTER.z + overShift);
+        else want.copy(pawn.position);
+        focus.lerp(want, reduce ? 1 : 1 - Math.pow(0.02, dt));
+      }
       camera.position.copy(focus).add(CAM);
-      camera.lookAt(focus.x, 1.2, focus.z);
+      starsNear.material.opacity = 0.75 + Math.sin(time * 1.3) * 0.2;
 
       if (!reduce) {
         puffs.forEach(function (s) {
@@ -420,18 +590,20 @@ window.Walk = {
       }
 
       // fog: pieces away from the figure are veiled (all clear in the overview)
-      var best = null, bestD = OPEN_RANGE;
-      pieces.forEach(function (pc) {
-        var o = Math.max(0.28, Math.min(1, 1 - (distTo(pc) - CLEAR) / FADE));
-        o = Math.max(o, 1 - zoom);
-        pc.mats[0].opacity = o;
-        pc.mats[1].opacity = o;
-        var ds = distTo(pc.stand);
-        if (ds < bestD) { bestD = ds; best = pc; }
-      });
-      if (!started) best = null;
-      if (best !== near) { near = best; opts.onNear(near ? near.project : null); }
-      opts.onMove(zoom * 7, false);
+      if (mode === "over" || mode === "walk") {
+        var best = null, bestD = OPEN_RANGE;
+        pieces.forEach(function (pc) {
+          var o = Math.max(0.22, Math.min(1, 1 - (distTo(pc) - CLEAR) / FADE));
+          o = Math.max(o, 1 - zoom);
+          pc.mats[0].opacity = o;
+          pc.mats[1].opacity = o;
+          var ds = distTo(pc.stand);
+          if (ds < bestD) { bestD = ds; best = pc; }
+        });
+        if (mode === "over") best = null;
+        if (best !== near) { near = best; opts.onNear(near ? near.project : null); }
+      }
+      opts.onMove(zoom * 7);
 
       renderer.render(scene, camera);
     }
@@ -441,6 +613,6 @@ window.Walk = {
       build();
       frame();
     });
-    return true;
+    return { climbBack: climbBack };
   }
 };
