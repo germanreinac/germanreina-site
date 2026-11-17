@@ -276,6 +276,7 @@
       host: host,
       projects: projects,
       fallLayer: document.getElementById("walk-fall"),
+      fallBack: document.getElementById("walk-fall-back"),
       makeFrame: frame,
       shapes: SHAPES,
       onOpen: openSheet,

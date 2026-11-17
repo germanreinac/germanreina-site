@@ -4,7 +4,7 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 Two views of the same projects:
 
-- **Gallery** (`#gallery`): a few platforms floating in dark space, seen in isometric view: an entrance, a long hall, a balcony and a tower, joined by floating stairs and a bridge, with art on the walls. Click a floor or stair to walk, click a piece to visit it. Click out in space and the figure jumps off where the edge is open (walls stop it); the fall is a second way to browse, a smooth scroll down past the projects. Other stand-in figures wander the platforms: walk into one to shove it, click one to throw it, and send it past an open edge to throw it out. The building is four short lists at the top of `js/walk.js` (platforms, links, walls, hanging spots). Falls back to a flat side-scrolling wall without WebGL.
+- **Gallery** (`#gallery`): a few platforms floating in dark space, seen in isometric view: an entrance, a long hall, a balcony and a tower, joined by floating stairs and a bridge, with art on the walls. Click a floor or stair to walk, click a piece to visit it. Click out in space and the figure jumps off where the edge is open (walls stop it); the fall is a second way to browse: as you scroll, the projects spiral up around the falling figure. Other stand-in figures wander the platforms: walk into one to shove it, click one to throw it, and send it past an open edge to throw it out. The building is four short lists at the top of `js/walk.js` (platforms, links, walls, hanging spots). Falls back to a flat side-scrolling wall without WebGL.
 - **Index** (`#index`): a plain list with filters. Straight to the point.
 
 ## Editing content

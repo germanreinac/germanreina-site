@@ -318,46 +318,49 @@ main { flex: 1; min-height: 0; position: relative; }
 }
 .walk[data-mode="walk"] .walk__blur, .walk[data-mode="drop"] .walk__blur { opacity: 1; }
 
-/* the fall: project cards coming up out of the depth */
+/* the fall: project cards spiral up around the figure.
+   Two layers with the same perspective: one under the canvas (behind the figure), one over it. */
+.walk canvas { position: relative; z-index: 1; }
+.walk__blur { z-index: 2; }
+.walk__intro { z-index: 3; }
+.walk__end { z-index: 3; }
 .fall {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  perspective: 1100px;
+  perspective-origin: 50% 50%;
 }
+.fall--back { z-index: 0; }
+.fall--front { z-index: 2; }
 .fcard {
   position: absolute;
   left: 50%;
-  top: 52%;
-  width: min(86vw, 60rem);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(24px, 4vw, 60px);
+  top: 50%;
   will-change: transform, opacity;
 }
-.fcard--flip { flex-direction: row-reverse; }
 .fcard__art {
-  flex: none;
-  width: min(40vw, 32rem, calc(56vh * (var(--ar))));
+  position: relative;
+  display: block;
+  width: min(30vw, 27rem, calc(46vh * (var(--ar))));
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
   pointer-events: auto;
   touch-action: none;
-  will-change: transform;
 }
 .fcard__art .frame {
   width: 100%;
   max-width: none;
   height: auto;
+  border-radius: 18px;
   box-shadow: 0 50px 80px -30px rgba(0, 0, 0, 0.85);
 }
-.fcard__art:hover .frame, .fcard__art:focus-visible .frame { transform: scale(1.02); }
-.fcard__art { position: relative; }
-.fcard__art .frame { border-radius: 18px; }
 .fcard__art .frame--empty .frame__title { visibility: hidden; }
+.fcard__art:hover .frame, .fcard__art:focus-visible .frame { transform: scale(1.03); }
+.fcard__art:focus-visible { outline-color: var(--star); }
 .fcard__pill {
   position: absolute;
   left: 16px;
@@ -369,30 +372,9 @@ main { flex: 1; min-height: 0; position: relative; }
   font-family: var(--mono);
   font-size: 0.85rem;
 }
-.fcard__art:focus-visible { outline-color: var(--star); }
-.fcard__text {
-  flex: 0 1 20rem;
-  min-width: 0;
-  color: var(--star-soft);
-  will-change: transform;
-}
-.fcard--flip .fcard__text { text-align: right; }
-.fcard__text h3 {
-  margin: 0.15em 0 0.3em;
-  font-size: clamp(1.8rem, 3.6vw, 3.2rem);
-  font-weight: 800;
-  line-height: 0.92;
-  letter-spacing: -0.035em;
-  color: var(--star);
-  text-wrap: balance;
-}
-.fcard__text p { margin: 0; font-size: 1rem; }
-.fcard__text .fcard__meta { font-family: var(--mono); font-size: 0.74rem; color: var(--pencil); }
+.fcard__text { display: none; }
 @media (max-width: 720px) {
-  .fcard, .fcard--flip { flex-direction: column; align-items: flex-start; gap: 14px; top: 54%; }
-  .fcard--flip .fcard__text { text-align: left; }
-  .fcard__art { width: min(78vw, 24rem, calc(36vh * (var(--ar)))); }
-  .fcard__text { flex: none; width: 100%; }
+  .fcard__art { width: min(56vw, 20rem, calc(32vh * (var(--ar)))); }
 }
 
 /* on a phone the name sits over the building, so it gets a dark fade behind it */
@@ -412,7 +394,7 @@ main { flex: 1; min-height: 0; position: relative; }
 .gallery.is-space .grain { display: none; }
 .gallery.is-space .walltext h1 { color: var(--star); }
 .gallery.is-space .walltext p { color: var(--star-soft); }
-.gallery.is-space .gallery__foot { color: var(--star-soft); }
+.gallery.is-space .gallery__foot { color: var(--star-soft); z-index: 4; }
 
 .gallery.is-space .walltext .walk__cta {
   margin-top: 1.4em;

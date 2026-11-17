@@ -11,7 +11,8 @@
     the edge is open. A wall or another platform in the way stops it.
   - Other figures stand around. Walk into one to shove it, click one to throw it.
     Shove or throw one past an open edge and it falls out of the gallery.
-  - The fall is a second way to browse: a plain, smooth scroll down past the projects.
+  - The fall is a second way to browse: as you scroll, the projects spiral up around
+    the falling figure, passing in front of it and behind it.
 
   Returns false if WebGL is not available, so main.js can fall back to the flat wall.
 */
@@ -22,7 +23,7 @@ window.Walk = {
     var host = opts.host, projects = opts.projects;
     var renderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     } catch (e) {
       return false;
     }
@@ -130,7 +131,7 @@ window.Walk = {
     }
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearColor(SPACE);
+    renderer.setClearColor(SPACE, 0); // see-through: the page behind is the same dark, and cards can sit behind the canvas
     host.appendChild(renderer.domElement);
     var canvas = renderer.domElement;
 
@@ -454,27 +455,41 @@ window.Walk = {
     window.addEventListener("resize", layout);
     layout();
 
-    /* ---- the fall: a plain, smooth scroll down past the projects ---- */
+    /* ---- the fall: projects spiral up around the falling figure ---- */
     var fallS = 0, fallTo = 0, fallEnd = false, fallFirst = 0, fallGap = 0, fallMax = 0; // all in screen pixels
+    var SWEEP = 215; // degrees a card turns around the figure while it crosses the screen
     function fallLayout() {
-      fallFirst = viewH * 0.9;
-      fallGap = Math.max(viewH * 0.8, aspect < 0.8 ? 600 : 520);
+      fallFirst = viewH * 0.72;
+      fallGap = viewH * 0.46;
       fallMax = fallFirst + (projects.length - 1) * fallGap;
     }
     fallLayout();
     function placeCards() {
+      var R = Math.min(viewW * 0.31, 470); // radius of the spiral
       cards.forEach(function (c, i) {
         var y = fallFirst + i * fallGap - fallS; // px below the middle of the screen
         var t = y / viewH;                        // -0.5 top edge, 0.5 bottom edge
-        var show = Math.abs(t) < 1.15;
+        var show = Math.abs(t) < 0.95;
         if (c.el.hidden === show) c.el.hidden = !show;
         if (!show) return;
-        c.el.style.transform = "translate(-50%,-50%) translate3d(0," + y.toFixed(1) + "px,0)";
-        c.el.style.opacity = Math.max(0, Math.min(1, 1.4 - Math.abs(t) * 1.8)).toFixed(2);
-        if (reduce) return;
-        // gentle depth only: the image lags a touch behind the caption and leans a little
-        c.art.style.transform = "translate3d(0," + (-y * 0.07).toFixed(1) + "px,0) rotate(" + (-c.side * t * 2.5).toFixed(2) + "deg)";
-        c.text.style.transform = "translate3d(0," + (y * 0.08).toFixed(1) + "px,0)";
+        // It comes up in front of the figure, swings round one side at the figure's height,
+        // and leaves behind it. Odd cards go round the other side.
+        var a = (90 - t * SWEEP) * Math.PI / 180;
+        var depth = Math.cos(a);                  // 1 = nearest you, -1 = furthest behind the figure
+        var x = c.side * Math.sin(a) * R;
+        var z = depth * R - R * 0.55;
+        var behind = depth < -0.12;
+        if (behind !== c.behind) { // move it to the layer under or over the figure
+          c.behind = behind;
+          (behind ? opts.fallBack : opts.fallLayer).appendChild(c.el);
+        }
+        var tr = "translate(-50%,-50%) translate3d(" + x.toFixed(1) + "px," + y.toFixed(1) + "px," + z.toFixed(1) + "px)";
+        if (!reduce) tr += " rotateY(" + (-c.side * Math.sin(a) * 48).toFixed(1) + "deg) rotateZ(" + (c.side * t * 7).toFixed(2) + "deg)";
+        c.el.style.transform = tr;
+        c.el.style.zIndex = String(1000 + Math.round(z));
+        var edge = Math.max(0, Math.min(1, (0.62 - Math.abs(t)) * 5)); // fades at the top and bottom
+        c.el.style.opacity = (edge * (0.42 + 0.58 * (depth + 1) / 2)).toFixed(2);
+        c.art.style.pointerEvents = behind ? "none" : "auto";
       });
     }
 
@@ -795,7 +810,7 @@ window.Walk = {
         want.copy(fallBase).addScaledVector(upV, -drop);
         focus.lerp(want, reduce ? 1 : 1 - Math.pow(0.0001, dt));
         // the figure hangs in the upper part of the screen, tumbling
-        tmp.copy(focus).addScaledVector(upV, halfH * 0.78).addScaledVector(rightV, Math.sin(time * 0.7) * 0.6).addScaledVector(towardV, 6);
+        tmp.copy(focus).addScaledVector(upV, halfH * 0.04).addScaledVector(rightV, Math.sin(time * 0.7) * 0.6).addScaledVector(towardV, 6);
         pawn.position.lerp(tmp, 1 - Math.pow(0.01, dt));
         if (!reduce) pawn.rotation.z = Math.sin(time * 1.6) * 0.7;
         starsFar.position.y = drop * 0.06;
