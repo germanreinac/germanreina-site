@@ -13,9 +13,9 @@
 window.SITE = {
   name: "Germán Reina",
   // The line under the name. Other lines of yours that would fit here:
-  //   "Creator of the art for OlliOlli World. Artist at Supercell."   (germanreina.com)
+  //   "Stay creative, stay weird."   (germanreina.com, artdiscipline.com)
   //   "Creative Vision and Art Direction for Video Games and Animation."   (Notion bio)
-  intro: "Stay creative, stay weird.",
+  intro: "Art Director from Lanzarote. Creator of the art for OlliOlli World. Artist at Supercell.",
   links: [
     { label: "Art Discipline", url: "https://artdiscipline.com" }
     // Add Instagram, YouTube, Patreon, email here.
