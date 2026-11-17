@@ -4,7 +4,7 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 Two views of the same projects:
 
-- **Gallery** (`#gallery`): a foggy 3D gallery you walk through with a small figure (arrows/WASD, scroll, or click the floor). Falls back to a flat side-scrolling wall without WebGL.
+- **Gallery** (`#gallery`): a foggy isometric gallery you walk through with a small figure (click the floor to walk, click a piece to visit it). Falls back to a flat side-scrolling wall without WebGL.
 - **Index** (`#index`): a plain list with filters. Straight to the point.
 
 ## Editing content

@@ -264,7 +264,7 @@
       projects: projects,
       onOpen: openSheet,
       isBlocked: function () { return sheet.open; },
-      onNear: function (p) { count.textContent = p ? p.title + ": click it or press Enter" : total; },
+      onNear: function (p) { count.textContent = p ? p.title + ": click it to open" : total; },
       onMove: function (walked, atEnd) {
         intro.style.opacity = Math.max(0, 1 - walked / 7).toFixed(2);
         end.hidden = !atEnd;
@@ -278,8 +278,8 @@
     document.getElementById("fog").hidden = true;
     var touch = window.matchMedia("(pointer: coarse)").matches;
     document.getElementById("hint").textContent = touch
-      ? "tap the floor to walk, tap a piece to open"
-      : "arrows or WASD, scroll, or click the floor";
+      ? "tap the floor to walk, tap a piece to visit it"
+      : "click the floor to walk, click a piece to visit it";
     return true;
   }
 
