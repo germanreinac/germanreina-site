@@ -4,67 +4,78 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Germán Reina</title>
-<meta name="description" content="Germán Reina. Visual artist and Art Director from Lanzarote. Games, comics and own projects.">
+<meta name="description" content="Germán Reina. Art Director from Lanzarote. Creator of the art for OlliOlli World. Artist at Supercell.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/site.css">
 </head>
 <body>
 <!-- body:start -->
 <header class="bar">
-  <a class="bar__name" href="#gallery">Germán Reina</a>
-  <nav class="modes" aria-label="View">
-    <a class="modes__btn" href="#gallery" data-mode="gallery">Gallery</a>
-    <a class="modes__btn" href="#index" data-mode="index">Index</a>
+  <a class="bar__name" href="#home">Germán Reina</a>
+  <nav class="bar__nav" aria-label="Sections">
+    <a href="#work" data-view="work">Work</a>
+    <a href="#about" data-view="about">About</a>
+    <a href="https://artdiscipline.com" target="_blank" rel="noopener">Newsletter ↗</a>
   </nav>
-  <a class="bar__out" href="https://artdiscipline.com" target="_blank" rel="noopener">Art Discipline ↗</a>
 </header>
 
 <main>
-  <section class="view gallery" id="view-gallery" aria-label="Gallery">
-    <div class="walk" id="walk" hidden>
-      <div class="walk__blur" aria-hidden="true"></div>
-      <div class="fall fall--back" id="walk-fall-back"></div>
-      <div class="fall fall--front" id="walk-fall"></div>
-      <div class="walltext walk__intro" id="walk-intro"></div>
-      <button class="walk__up" id="walk-up" type="button" aria-label="Climb back up to the gallery" title="Back to the gallery" hidden>↑</button>
-      <div class="walk__end" id="walk-end" hidden>
-        <span>That's the bottom.</span>
-        <button type="button" id="walk-climb">Climb back up</button>
-        <a href="#index">See everything as a list</a>
-      </div>
+  <section class="view home" id="view-home" aria-label="Home">
+    <div class="home__stage" id="stage" aria-hidden="true">
+      <video class="home__video" id="ra" autoplay muted loop playsinline poster="images/home/ra-poster.jpg">
+        <source src="images/home/ra.mp4" type="video/mp4">
+      </video>
     </div>
-    <div class="stage" id="stage-warehouse" hidden><div class="walltext walk__intro"></div></div>
-    <div class="stage" id="stage-island" hidden><div class="walltext walk__intro"></div></div>
-    <nav class="homes" id="homes" aria-label="Home screen to try" hidden>
-      <span>Home screen</span>
-      <a href="#gallery" data-home="gallery">Gallery</a>
-      <a href="#warehouse" data-home="warehouse">Warehouse</a>
-      <a href="#island" data-home="island">Island</a>
-    </nav>
-    <div class="tip" id="tip" hidden></div>
-    <div class="room" id="room" tabindex="0"></div>
-    <div class="fog" id="fog" aria-hidden="true"><i></i><i></i><i></i></div>
-    <div class="grain" aria-hidden="true"></div>
-    <div class="gallery__foot">
-      <span id="room-count"></span>
-      <span class="gallery__hint" id="hint">scroll or drag →</span>
+    <div class="home__text">
+      <h1 class="home__name" id="home-name"></h1>
+      <p class="home__intro" id="home-intro"></p>
     </div>
+    <nav class="doors" id="doors" aria-label="Where to go"></nav>
+    <p class="home__motto" id="home-motto"></p>
   </section>
 
-  <section class="view index" id="view-index" aria-label="Index" hidden>
-    <div class="index__wrap">
-      <div class="index__head">
-        <h1 class="index__title">Index</h1>
+  <section class="view page" id="view-work" aria-label="Work" hidden>
+    <div class="page__wrap">
+      <div class="page__head">
+        <h1 class="page__title">Work</h1>
         <div class="filters" role="group" aria-label="Filter projects">
           <button class="chip" type="button" data-filter="all" aria-pressed="true">Everything</button>
           <button class="chip" type="button" data-filter="studio" aria-pressed="false">Games and studio work</button>
           <button class="chip" type="button" data-filter="own" aria-pressed="false">Own projects</button>
         </div>
       </div>
+      <p class="page__note" id="work-note"></p>
       <div class="table" id="table"></div>
-      <footer class="index__foot" id="index-foot"></footer>
+      <footer class="foot" data-foot></footer>
+    </div>
+  </section>
+
+  <section class="view page" id="view-about" aria-label="About" hidden>
+    <div class="page__wrap">
+      <h1 class="page__title">About</h1>
+      <div class="about">
+        <div class="about__main">
+          <p class="about__lead" id="about-lead"></p>
+          <p class="about__text" id="about-text"></p>
+          <h2>Get in touch</h2>
+          <p class="about__mail"><a id="about-mail"></a></p>
+          <div class="about__links" id="about-links"></div>
+        </div>
+        <figure class="about__photo" id="about-photo"></figure>
+      </div>
+      <div class="cols">
+        <section>
+          <h2>Experience</h2>
+          <div class="rows" id="experience"></div>
+        </section>
+        <section>
+          <h2>Talks &amp; workshops</h2>
+          <div class="rows" id="talks"></div>
+        </section>
+      </div>
+      <footer class="foot" data-foot></footer>
     </div>
   </section>
 </main>
@@ -74,10 +85,7 @@
   <div class="sheet__body" id="sheet-body"></div>
 </dialog>
 <!-- body:end -->
-<script src="js/vendor/three.min.js"></script>
 <script src="js/projects.js"></script>
-<script src="js/walk.js"></script>
-<script src="js/homes.js"></script>
-<script src="js/main.js"></script>
+<script src="js/site.js"></script>
 </body>
 </html>

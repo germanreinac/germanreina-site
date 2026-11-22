@@ -2,31 +2,30 @@
 
 Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve the folder with any static host.
 
-Two views of the same projects:
+## The provisional site (`index.html`)
 
-- **Gallery** (`#gallery`): a few platforms floating in dark space, seen in isometric view: an entrance, a long hall, a balcony and a tower, joined by floating stairs and a bridge, with art on the walls. Click a floor or stair to walk, click a piece to visit it. Click out in space and the figure jumps off where the edge is open (walls stop it); the fall is a second way to browse: as you scroll, the projects spiral up around the falling figure. Other stand-in figures wander the platforms: walk into one to shove it, click one to throw it, and send it past an open edge to throw it out. The building is four short lists at the top of `js/walk.js` (platforms, links, walls, hanging spots). Falls back to a flat side-scrolling wall without WebGL.
-- **Index** (`#index`): a plain list with filters. Straight to the point.
+Three views, switched by the address:
 
-## Home screens being tried
+- `#home`: dark home with the looping Ra video behind the name, and four doors (Projects, Megalith, Art Discipline, Improve your art).
+- `#work`: a plain list of projects with filters. Each row opens a sheet with the facts; images are on ArtStation for now.
+- `#about`: bio, contact, links, experience, talks and workshops.
 
-The gallery has a small switch (top right) between three home screens, so they can be compared before choosing one:
+Files: `index.html`, `css/site.css`, `js/site.js`, and the content in `js/projects.js`.
 
-- `#gallery`: the walkable platforms described above (`js/walk.js`).
-- `#warehouse`: a warehouse with long arms reaching out of it, one project hanging from each.
-- `#island`: a floating island with the artist drawing at a desk, the projects circling as loose pages.
+### Editing content
 
-The last two live in `js/homes.js`. The artist figure is a plain stand-in.
+Everything is in `js/projects.js`: the line under the name, the home doors, links, the about text, experience, talks, and one block per project.
 
-## Editing content
+To add images to a project, put them in `images/<project-slug>/` and list the paths in that project's `images` array. They show in the project sheet, and the ArtStation link for that project goes away.
 
-Everything is in `js/projects.js`: the intro line, the links, and one block per project.
+The home video is `images/home/ra.mp4` with `images/home/ra-poster.jpg` as its still.
 
-To add images, put them in `images/<project-slug>/` and list the paths in that project's `images` array. The first image is the piece on the gallery wall; all of them show in the project sheet. A project with no images shows a coloured placeholder.
+## The lab (`lab.html`)
 
-## Files
+Interactive home screens being tried out. Not linked from the provisional site. A switch at the top right chooses between them:
 
-- `index.html`: page shell
-- `css/style.css`: all styling, colour and type tokens at the top
-- `js/projects.js`: content
-- `js/walk.js`: the walkable 3D gallery (three.js, vendored in `js/vendor/`)
-- `js/main.js`: flat wall fallback, index and project sheet behaviour
+- `lab.html#gallery`: walkable platforms floating in space, with figures to shove around and a jump-off spiral of projects (`js/walk.js`).
+- `lab.html#warehouse`: a warehouse with long arms reaching out of it, one project hanging from each (`js/homes.js`).
+- `lab.html#island`: a floating island with the artist drawing at a desk, the projects circling as loose pages (`js/homes.js`).
+
+Files: `lab.html`, `css/style.css`, `js/main.js`, `js/walk.js`, `js/homes.js`, `js/vendor/three.min.js`. The figures are plain stand-ins and the pieces are coloured placeholders until the art is made.
