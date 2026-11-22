@@ -239,8 +239,15 @@
   sheet.addEventListener("click", function (e) { if (e.target === sheet) sheet.close(); });
 
   /* ---------- mode ---------- */
+  var HOMES = ["gallery", "warehouse", "island"], homes = {}, walkHint = "";
+  var HOME_HINTS = {
+    warehouse: "each arm holds a project · click one to open it",
+    island: "drag to spin the pages · click one to open it · click the artist"
+  };
   function setMode() {
-    var mode = location.hash === "#index" ? "index" : "gallery";
+    var name = location.hash.slice(1);
+    var mode = name === "index" ? "index" : "gallery";
+    if (mode === "gallery" && homes.ready) showHome(HOMES.indexOf(name) > 0 ? name : "gallery");
     document.getElementById("view-gallery").hidden = mode !== "gallery";
     document.getElementById("view-index").hidden = mode !== "index";
     document.querySelectorAll(".modes__btn").forEach(function (b) {
@@ -285,7 +292,8 @@
       onThrown: function (n) { thrownOut = n; count.textContent = tally(); },
       onMove: function (walked) { intro.style.opacity = Math.max(0, 1 - walked / 7).toFixed(2); },
       onState: function (state, atEnd) {
-        hint.textContent = HINTS[state];
+        walkHint = HINTS[state];
+        if (!homes.ready || homes.current === "gallery") hint.textContent = walkHint;
         up.hidden = state !== "fall" || atEnd;
         end.hidden = !(state === "fall" && atEnd);
       }
@@ -296,7 +304,8 @@
     intro.appendChild(el("h1", null, site.name));
     intro.appendChild(el("p", null, site.intro));
     count.textContent = "";
-    hint.textContent = HINTS.walk;
+    walkHint = HINTS.walk;
+    hint.textContent = walkHint;
     room.hidden = true;
     document.getElementById("fog").hidden = true;
     up.addEventListener("click", walk.climbBack);
@@ -304,9 +313,54 @@
     return true;
   }
 
+  /* The other home screens being tried out. Only one is shown and running at a time. */
+  function showHome(name) {
+    homes.current = name;
+    document.getElementById("walk").hidden = name !== "gallery";
+    document.getElementById("stage-warehouse").hidden = name !== "warehouse";
+    document.getElementById("stage-island").hidden = name !== "island";
+    document.getElementById("hint").textContent = name === "gallery" ? walkHint : HOME_HINTS[name];
+    document.getElementById("room-count").hidden = name !== "gallery";
+    document.getElementById("tip").hidden = true;
+    document.querySelectorAll("#homes a").forEach(function (a) {
+      if (a.dataset.home === name) a.setAttribute("aria-current", "true");
+      else a.removeAttribute("aria-current");
+    });
+  }
+  function startHomes() {
+    if (!window.Homes) return;
+    var tip = document.getElementById("tip");
+    var made = 0;
+    ["warehouse", "island"].forEach(function (name) {
+      var host = document.getElementById("stage-" + name);
+      var intro = host.querySelector(".walk__intro");
+      intro.appendChild(el("h1", null, site.name));
+      intro.appendChild(el("p", null, site.intro));
+      var ok = window.Homes[name]({
+        host: host,
+        projects: projects,
+        onOpen: openSheet,
+        isBlocked: function () { return sheet.open; },
+        onHover: function (p, x, y) {
+          tip.hidden = !p;
+          if (!p) return;
+          tip.textContent = p.title;
+          tip.style.left = x + "px";
+          tip.style.top = y + "px";
+        }
+      });
+      if (ok) made++;
+    });
+    if (!made) return;
+    homes.ready = true;
+    document.getElementById("homes").hidden = false;
+  }
+
   if (!startWalk()) {
     buildGallery();
     wireRoom();
+  } else {
+    startHomes();
   }
   buildIndex("all");
   wireIndex();
