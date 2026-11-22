@@ -22,7 +22,7 @@ window.SITE = {
 
   // The four doors on the home page.
   doors: [
-    { title: "Projects", sub: "Art for games", url: "#work" },
+    { title: "Projects", sub: "Art for games", url: "#index" },
     { title: "Megalith", sub: "Graphic novel", url: "https://www.patreon.com/c/MegalithIslands/membership" },
     { title: "Art Discipline", sub: "Newsletter", url: "https://artdiscipline.com" },
     { title: "Improve your art", sub: "Mentorship and free brushes", url: "https://germanreinac.gumroad.com/" }

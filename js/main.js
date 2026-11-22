@@ -36,6 +36,16 @@
     return e;
   }
 
+  function outLink(label, url, cls) {
+    var a = el("a", cls, label);
+    a.href = url;
+    if (url.charAt(0) !== "#" && url.indexOf("mailto:") !== 0) {
+      a.target = "_blank";
+      a.rel = "noopener";
+    }
+    return a;
+  }
+
   function linkList(parent) {
     site.links.forEach(function (l) {
       var a = el("a", null, l.label + " ↗");
@@ -224,12 +234,11 @@
         img.loading = "lazy";
         imgs.appendChild(img);
       });
-    } else {
-      var f = frame(p, null);
-      f.style.setProperty("--tone", p.tone);
-      imgs.appendChild(f);
     }
-    sheetBody.appendChild(imgs);
+    var more = el("p", "sheet__links");
+    if (!p.images.length && site.portfolio) more.appendChild(outLink("See the art on " + site.portfolio.label + " ↗", site.portfolio.url));
+    if (more.childNodes.length) sheetBody.appendChild(more);
+    if (p.images.length) sheetBody.appendChild(imgs);
 
     sheet.scrollTop = 0;
     if (!sheet.open) sheet.showModal();
@@ -246,7 +255,9 @@
   };
   function setMode() {
     var name = location.hash.slice(1);
-    var mode = name === "index" ? "index" : "gallery";
+    var about = document.getElementById("view-about");
+    var mode = name === "index" ? "index" : (name === "about" && about ? "about" : "gallery");
+    if (about) about.hidden = mode !== "about";
     if (mode === "gallery" && homes.ready) showHome(HOMES.indexOf(name) > 0 ? name : "gallery");
     document.getElementById("view-gallery").hidden = mode !== "gallery";
     document.getElementById("view-index").hidden = mode !== "index";
@@ -290,7 +301,11 @@
       isBlocked: function () { return sheet.open; },
       onNear: function () {},
       onThrown: function (n) { thrownOut = n; count.textContent = tally(); },
-      onMove: function (walked) { intro.style.opacity = Math.max(0, 1 - walked / 7).toFixed(2); },
+      onMove: function (walked) {
+        var o = Math.max(0, 1 - walked / 7);
+        intro.style.opacity = o.toFixed(2);
+        intro.style.visibility = o < 0.03 ? "hidden" : "visible"; // so its links cannot be clicked once it has faded
+      },
       onState: function (state, atEnd) {
         walkHint = HINTS[state];
         if (!homes.ready || homes.current === "gallery") hint.textContent = walkHint;
@@ -303,6 +318,17 @@
     gallery.classList.add("is-space");
     intro.appendChild(el("h1", null, site.name));
     intro.appendChild(el("p", null, site.intro));
+    if (site.doors) { // the same four doors as the current site
+      var doors = el("nav", "walk__doors");
+      doors.setAttribute("aria-label", "Where to go");
+      site.doors.forEach(function (d) {
+        var a = outLink("", d.url, "walk__door");
+        a.appendChild(el("span", "walk__door-title", d.title + (d.url.charAt(0) === "#" ? " →" : " ↗")));
+        a.appendChild(el("span", "walk__door-sub", d.sub));
+        doors.appendChild(a);
+      });
+      intro.appendChild(doors);
+    }
     count.textContent = "";
     walkHint = HINTS.walk;
     hint.textContent = walkHint;
@@ -328,7 +354,7 @@
     });
   }
   function startHomes() {
-    if (!window.Homes) return;
+    if (!window.Homes || !document.getElementById("stage-warehouse")) return;
     var tip = document.getElementById("tip");
     var made = 0;
     ["warehouse", "island"].forEach(function (name) {
@@ -362,8 +388,53 @@
   } else {
     startHomes();
   }
+  /* About: bio, contact, links, experience and talks, from js/projects.js */
+  function buildAbout() {
+    var about = site.about;
+    if (!about || !document.getElementById("view-about")) return;
+    function byId(id) { return document.getElementById(id); }
+    byId("about-lead").textContent = about.lead;
+    byId("about-text").textContent = about.text;
+    var mail = byId("about-mail");
+    mail.textContent = site.email;
+    mail.href = "mailto:" + site.email;
+    site.links.forEach(function (l) { byId("about-links").appendChild(outLink(l.label + " ↗", l.url)); });
+    var img = el("img");
+    img.src = about.photo.src;
+    img.alt = about.photo.alt;
+    img.loading = "lazy";
+    byId("about-photo").appendChild(img);
+    byId("about-photo").appendChild(el("figcaption", null, about.photo.credit));
+    about.experience.forEach(function (x) {
+      var r = el("div", "xrow");
+      r.appendChild(el("span", "xrow__when", x.when));
+      var b = el("span", "xrow__body");
+      b.appendChild(el("strong", null, x.who));
+      b.appendChild(el("span", null, x.what));
+      r.appendChild(b);
+      byId("experience").appendChild(r);
+    });
+    about.talks.forEach(function (t) {
+      var a = outLink("", t.url, "xrow xrow--link");
+      var b = el("span", "xrow__body");
+      b.appendChild(el("strong", null, t.title + " ↗"));
+      b.appendChild(el("span", null, t.sub));
+      a.appendChild(b);
+      byId("talks").appendChild(a);
+    });
+    byId("about-foot").appendChild(el("span", null, "© " + new Date().getFullYear() + " " + site.name));
+    byId("about-foot").appendChild(el("span", null, site.motto));
+  }
+  var indexNote = document.getElementById("index-note");
+  if (indexNote && site.portfolio) {
+    indexNote.appendChild(document.createTextNode("Images of the work are on "));
+    indexNote.appendChild(outLink(site.portfolio.label + " ↗", site.portfolio.url));
+    indexNote.appendChild(document.createTextNode(" for now."));
+  }
+
   buildIndex("all");
   wireIndex();
+  buildAbout();
   setMode();
   window.addEventListener("hashchange", setMode);
   requestFog();

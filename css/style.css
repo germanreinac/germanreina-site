@@ -528,6 +528,95 @@ main { flex: 1; min-height: 0; position: relative; }
   font-size: 0.8rem;
 }
 
+/* ---------- the four doors under the name ---------- */
+.walk__doors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  gap: 0 28px;
+  margin-top: 1.6em;
+}
+.walk__door {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 0 10px;
+  border-top: 1px solid rgba(236, 238, 234, 0.22);
+  color: var(--star);
+  text-decoration: none;
+  pointer-events: auto;
+}
+.walk__door-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+.walk__door-sub { font-family: var(--mono); font-size: 0.72rem; color: var(--star-soft); }
+.walk__door:hover, .walk__door:focus-visible { color: var(--pencil); border-top-color: var(--pencil); outline-color: var(--star); }
+
+/* ---------- index note, about ---------- */
+.index__note { margin: -6px 0 16px; font-family: var(--mono); font-size: 0.8rem; color: var(--ink-soft); }
+#view-about h2 {
+  margin: 0 0 10px;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+#view-about p, #view-about figure { margin: 0; }
+.about {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: clamp(24px, 5vw, 64px);
+  align-items: start;
+  margin-top: clamp(20px, 3vw, 36px);
+}
+.about__lead {
+  font-size: clamp(1.5rem, 3.2vw, 2.3rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+#view-about .about__text { margin: 0.9em 0 2em; max-width: 34rem; font-size: 1.1rem; }
+.about__mail { font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 700; overflow-wrap: anywhere; }
+.about__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 14px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+.about__photo img { display: block; width: 100%; height: auto; }
+.about__photo figcaption { margin-top: 6px; font-family: var(--mono); font-size: 0.72rem; color: var(--ink-soft); }
+.cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(24px, 5vw, 64px);
+  margin-top: clamp(32px, 5vw, 56px);
+}
+.rows { border-top: 1px solid var(--ink); }
+.xrow {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+}
+.xrow--link { grid-template-columns: minmax(0, 1fr); padding-inline: 8px; margin-inline: -8px; }
+.xrow--link:hover, .xrow--link:focus-visible { background: var(--pencil); }
+.xrow__when { font-family: var(--mono); font-size: 0.76rem; color: var(--ink-soft); padding-top: 3px; }
+.xrow__body { display: flex; flex-direction: column; min-width: 0; }
+.xrow__body strong { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.01em; }
+.xrow__body span { color: var(--ink-soft); }
+.about__foot { justify-content: space-between; color: var(--ink-soft); }
+.sheet__links { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 0; font-family: var(--mono); font-size: 0.85rem; }
+@media (max-width: 720px) {
+  .about, .cols { grid-template-columns: minmax(0, 1fr); }
+  .about__photo { order: -1; }
+  .xrow { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .walk__doors { margin-top: 1em; }
+  .walk__door { padding: 6px 0 7px; }
+}
+
 /* ---------- project sheet ---------- */
 .sheet {
   width: min(40rem, 100%);
