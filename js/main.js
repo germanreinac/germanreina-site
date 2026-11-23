@@ -266,6 +266,7 @@
       else b.removeAttribute("aria-current");
     });
     if (mode === "gallery") requestFog();
+    heroOn = mode === "gallery";
     if (heroVideo && !reduceMotion) { // only play while the home page is showing
       if (mode === "gallery") { var pl = heroVideo.play(); if (pl && pl.catch) pl.catch(function () {}); }
       else heroVideo.pause();
@@ -389,14 +390,92 @@
     });
     return doors;
   }
-  var heroVideo = null;
+  var heroVideo = null, heroOn = true;
   function startHero() {
     var intro = document.getElementById("hero-intro"), stage = document.getElementById("hero-stage");
+    var canvas = document.getElementById("hero-canvas"), ctx = canvas.getContext("2d");
     heroVideo = document.getElementById("hero-video");
     intro.appendChild(el("h1", null, site.name));
     intro.appendChild(el("p", null, site.intro));
-    intro.appendChild(doorsNav());
     document.getElementById("hint").textContent = site.motto || "";
+    var touch = window.matchMedia("(pointer: coarse)").matches;
+    document.getElementById("room-count").textContent = reduceMotion ? "" : (touch ? "rub him with your finger" : "run the pointer over him");
+
+    var poster = new Image();
+    poster.src = heroVideo.getAttribute("poster");
+    var W = 0, H = 0, dpr = 1, dust = [], last = performance.now();
+
+    function size() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = canvas.clientWidth;
+      H = canvas.clientHeight;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+    }
+    window.addEventListener("resize", size);
+    size();
+
+    // Where the pointer passes, the figure breaks into dust that drifts up and then grows back.
+    function rub(e) {
+      if (reduceMotion) return;
+      var r = canvas.getBoundingClientRect();
+      var x = e.clientX - r.left, y = e.clientY - r.top;
+      for (var i = 0; i < 7; i++) {
+        var a = Math.random() * 6.283, d = Math.random() * 46;
+        dust.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, r: 7 + Math.random() * 34, life: 1, fade: 0.28 + Math.random() * 0.4, vx: (Math.random() - 0.5) * 26, vy: -10 - Math.random() * 34 });
+      }
+      if (dust.length > 700) dust.splice(0, dust.length - 700);
+    }
+    var hero = document.getElementById("hero");
+    hero.addEventListener("pointermove", rub);
+    hero.addEventListener("pointerdown", rub);
+
+    function draw(now) {
+      requestAnimationFrame(draw);
+      if (!heroOn) return;
+      var dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (canvas.clientWidth !== W || canvas.clientHeight !== H) size();
+      var src = heroVideo.readyState >= 2 ? heroVideo : (poster.complete && poster.naturalWidth ? poster : null);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(0, 0, W, H);
+      if (!src) return;
+      var sw = src.videoWidth || src.naturalWidth, sh = src.videoHeight || src.naturalHeight;
+      var tall = W / H < 0.8;
+      // the figure sits in the middle of the screen; on a tall screen it is drawn smaller so it fits under the name
+      var scale = Math.max(W / sw, H / sh) * (tall ? 0.74 : 1);
+      var cx = W * 0.5, cy = H * (tall ? 0.56 : 0.5);
+      ctx.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
+      // fade the clip's own backdrop away around the figure
+      var rx = sh * scale * 0.42, ry = sh * scale * 0.56;
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(rx / ry, 1);
+      var g = ctx.createRadialGradient(0, 0, ry * 0.45, 0, 0, ry);
+      g.addColorStop(0, "rgba(0,0,0,1)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-ry * 2, -ry * 2, ry * 4, ry * 4);
+      ctx.restore();
+      // the dust eats holes in it
+      ctx.globalCompositeOperation = "destination-out";
+      for (var i = dust.length - 1; i >= 0; i--) {
+        var p = dust[i];
+        p.life -= p.fade * dt;
+        if (p.life <= 0) { dust.splice(i, 1); continue; }
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        var gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+        gr.addColorStop(0, "rgba(0,0,0," + Math.min(1, p.life * 1.4).toFixed(2) + ")");
+        gr.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = gr;
+        ctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+      }
+    }
+    requestAnimationFrame(draw);
+
     if (reduceMotion) {
       heroVideo.removeAttribute("autoplay");
       heroVideo.pause();
