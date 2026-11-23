@@ -4,11 +4,12 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 ## The site (`index.html`)
 
-Three views, switched from the bar at the top:
+Two views, switched from the bar at the top:
 
-- **Home** (`#home`): your name, the line under it and four doors (Projects, Megalith, Art Discipline, Improve your art) over the looping Ra video from the current site. This stands in for the interactive gallery until its art is made.
+- **Gallery** (`#gallery`): the home page. Your name, the line under it and four doors (Projects, Megalith, Art Discipline, Improve your art) over the looping Ra video from the current site. This stands in for the interactive gallery until its art is made.
 - **Index** (`#index`): a plain list of projects with filters. Each row opens a sheet with the facts; images are on ArtStation for now.
-- **About** (`#about`): bio, contact, links, experience, talks and workshops.
+
+There is no About page for now. Its content (bio, contact, links, experience, talks) is still in `js/projects.js` under `about`, and `js/main.js` still knows how to build it if an About view is added back to `index.html`.
 
 Files: `index.html`, `css/style.css`, `js/main.js`, and the content in `js/projects.js`. The home video is `images/home/ra.mp4` with `images/home/ra-poster.jpg` as its still.
 
