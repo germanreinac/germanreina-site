@@ -266,12 +266,17 @@
       else b.removeAttribute("aria-current");
     });
     if (mode === "gallery") requestFog();
+    if (heroVideo && !reduceMotion) { // only play while the home page is showing
+      if (mode === "gallery") { var pl = heroVideo.play(); if (pl && pl.catch) pl.catch(function () {}); }
+      else heroVideo.pause();
+    }
   }
 
   /* Walkable 3D gallery when WebGL is there, flat wall otherwise. */
   function startWalk() {
     if (!window.Walk) return false;
     var host = document.getElementById("walk");
+    if (!host) return false;
     var gallery = document.getElementById("view-gallery");
     var intro = document.getElementById("walk-intro");
     var end = document.getElementById("walk-end");
@@ -318,17 +323,7 @@
     gallery.classList.add("is-space");
     intro.appendChild(el("h1", null, site.name));
     intro.appendChild(el("p", null, site.intro));
-    if (site.doors) { // the same four doors as the current site
-      var doors = el("nav", "walk__doors");
-      doors.setAttribute("aria-label", "Where to go");
-      site.doors.forEach(function (d) {
-        var a = outLink("", d.url, "walk__door");
-        a.appendChild(el("span", "walk__door-title", d.title + (d.url.charAt(0) === "#" ? " →" : " ↗")));
-        a.appendChild(el("span", "walk__door-sub", d.sub));
-        doors.appendChild(a);
-      });
-      intro.appendChild(doors);
-    }
+    if (site.doors) intro.appendChild(doorsNav()); // the same four doors as the current site
     count.textContent = "";
     walkHint = HINTS.walk;
     hint.textContent = walkHint;
@@ -382,7 +377,42 @@
     document.getElementById("homes").hidden = false;
   }
 
-  if (!startWalk()) {
+  /* The home page for now: the Ra video behind the name, until the interactive gallery has its art. */
+  function doorsNav() {
+    var doors = el("nav", "walk__doors");
+    doors.setAttribute("aria-label", "Where to go");
+    site.doors.forEach(function (d) {
+      var a = outLink("", d.url, "walk__door");
+      a.appendChild(el("span", "walk__door-title", d.title + (d.url.charAt(0) === "#" ? " →" : " ↗")));
+      a.appendChild(el("span", "walk__door-sub", d.sub));
+      doors.appendChild(a);
+    });
+    return doors;
+  }
+  var heroVideo = null;
+  function startHero() {
+    var intro = document.getElementById("hero-intro"), stage = document.getElementById("hero-stage");
+    heroVideo = document.getElementById("hero-video");
+    intro.appendChild(el("h1", null, site.name));
+    intro.appendChild(el("p", null, site.intro));
+    intro.appendChild(doorsNav());
+    document.getElementById("hint").textContent = site.motto || "";
+    if (reduceMotion) {
+      heroVideo.removeAttribute("autoplay");
+      heroVideo.pause();
+      return;
+    }
+    // the figure leans a little towards the pointer
+    window.addEventListener("pointermove", function (e) {
+      if (e.pointerType !== "mouse") return;
+      var x = e.clientX / window.innerWidth - 0.5, y = e.clientY / window.innerHeight - 0.5;
+      stage.style.transform = "translate3d(" + (-x * 26).toFixed(1) + "px," + (-y * 18).toFixed(1) + "px,0) rotateY(" + (x * 5).toFixed(2) + "deg) rotateX(" + (-y * 4).toFixed(2) + "deg)";
+    });
+  }
+
+  if (document.getElementById("hero")) {
+    startHero();
+  } else if (!startWalk()) {
     buildGallery();
     wireRoom();
   } else {
