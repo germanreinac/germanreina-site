@@ -6,7 +6,7 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 Two views, switched from the bar at the top:
 
-- **Gallery** (`#gallery`): the home page. Your name and the line under it beside the looping Ra video from the current site, centred. The picture glitches in a patch around the pointer or finger and settles when it stops. This stands in for the interactive gallery until its art is made.
+- **Gallery** (`#gallery`): the home page. Your name and the line under it beside the looping Ra video from the current site, centred. The picture glitches in small patches along the path of the pointer or finger, leaving a short trail that settles. Titles and links across the site play the same glitch, briefly, when the pointer reaches them. This stands in for the interactive gallery until its art is made.
 - **Index** (`#index`): a plain list of projects with filters. Each row opens a sheet with the facts; images are on ArtStation for now.
 
 There is no About page for now. Its content (bio, contact, links, experience, talks) is still in `js/projects.js` under `about`, and `js/main.js` still knows how to build it if an About view is added back to `index.html`.

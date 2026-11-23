@@ -46,6 +46,27 @@
     return a;
   }
 
+  /* Text glitch: the same torn rows and red / blue-green split as the figure on the home page,
+     played briefly when the pointer reaches a title or a link. */
+  function glitch(node) {
+    if (reduceMotion || !node || node.dataset.glitch) return node;
+    node.dataset.glitch = "1";
+    node.classList.add("glitch");
+    node.setAttribute("data-text", node.textContent);
+    node.addEventListener("pointerenter", function () { burst(node); });
+    node.addEventListener("focus", function () { burst(node); });
+    return node;
+  }
+  function burst(node) {
+    if (reduceMotion || !node) return;
+    node.setAttribute("data-text", node.textContent);
+    node.classList.remove("is-glitching");
+    void node.offsetWidth; // restart the animation
+    node.classList.add("is-glitching");
+    clearTimeout(node._glitchT);
+    node._glitchT = setTimeout(function () { node.classList.remove("is-glitching"); }, 420);
+  }
+
   function linkList(parent) {
     site.links.forEach(function (l) {
       var a = el("a", null, l.label + " ↗");
@@ -170,7 +191,10 @@
         r.type = "button";
         r.dataset.slug = p.slug;
         r.appendChild(el("span", "row__year", p.year || "—"));
-        r.appendChild(el("span", "row__title", p.title));
+        var t = el("span", "row__title", p.title);
+        r.appendChild(t);
+        glitch(t);
+        r.addEventListener("pointerenter", function () { burst(t); });
         r.appendChild(el("span", "row__role", p.role));
         r.appendChild(el("span", "row__with", p.with));
         r.appendChild(el("span", "row__go", "→"));
@@ -242,6 +266,8 @@
 
     sheet.scrollTop = 0;
     if (!sheet.open) sheet.showModal();
+    glitch(h);
+    burst(h);
   }
 
   document.getElementById("sheet-close").addEventListener("click", function () { sheet.close(); });
@@ -267,6 +293,7 @@
     });
     if (mode === "gallery") requestFog();
     heroOn = mode === "gallery";
+    if (mode === "index") burst(document.querySelector("#view-index .index__title"));
     if (heroVideo && !reduceMotion) { // only play while the home page is showing
       if (mode === "gallery") { var pl = heroVideo.play(); if (pl && pl.catch) pl.catch(function () {}); }
       else heroVideo.pause();
@@ -417,30 +444,33 @@
     window.addEventListener("resize", size);
     size();
 
-    // The picture glitches in a patch around the pointer or finger, and settles when it stops moving.
-    var RADIUS = 150, px = 0, py = 0, energy = 0, slices = [], sliceAge = 1;
+    // The picture glitches in small patches along the path of the pointer or finger.
+    // Each patch fades and shrinks on its own, so moving leaves a short trail behind.
+    var RADIUS = 58, SHIFT = 26, trail = [];
     function poke(e) {
       if (reduceMotion) return;
       var r = canvas.getBoundingClientRect();
-      px = e.clientX - r.left;
-      py = e.clientY - r.top;
-      energy = 1;
+      var x = e.clientX - r.left, y = e.clientY - r.top;
+      var head = trail[trail.length - 1];
+      if (head && Math.hypot(head.x - x, head.y - y) < 14) { head.x = x; head.y = y; head.e = 1; return; }
+      trail.push({ x: x, y: y, e: 1, age: 1, slices: [] });
+      if (trail.length > 28) trail.shift();
     }
     var hero = document.getElementById("hero");
     hero.addEventListener("pointermove", poke);
     hero.addEventListener("pointerdown", poke);
 
-    function reslice() {
-      slices = [];
-      var n = 10 + Math.floor(Math.random() * 10);
+    function reslice(p) {
+      p.slices = [];
+      var r = RADIUS * (0.45 + 0.55 * p.e), n = 3 + Math.floor(Math.random() * 5 * p.e + 1);
       for (var i = 0; i < n; i++) {
-        var y = (Math.random() * 2 - 1) * RADIUS;
-        slices.push({
+        var y = (Math.random() * 2 - 1) * r;
+        p.slices.push({
           y: y,
-          h: 2 + Math.random() * Math.random() * 30,
-          half: Math.sqrt(RADIUS * RADIUS - y * y),
-          shift: (Math.random() * 2 - 1) * 70,
-          split: Math.random() < 0.45 ? 6 + Math.random() * 16 : 0
+          h: 1.5 + Math.random() * Math.random() * 12,
+          half: Math.sqrt(r * r - y * y),
+          shift: (Math.random() * 2 - 1) * SHIFT,
+          split: Math.random() < 0.5 ? 3 + Math.random() * 7 : 0
         });
       }
     }
@@ -480,40 +510,44 @@
       bctx.restore();
       ctx.drawImage(buf, 0, 0, W, H);
 
-      // 2. the glitch: rows inside the patch are torn sideways, some with split colours
-      if (energy <= 0.01) return;
-      energy = Math.max(0, energy - dt * 1.6);
-      sliceAge += dt;
-      if (sliceAge > 0.055) { sliceAge = 0; reslice(); }
-      var amount = energy * energy;
-      for (var i = 0; i < slices.length; i++) {
-        var s = slices[i];
-        var x0 = px - s.half, y0 = py + s.y, w = s.half * 2, h = s.h;
-        if (y0 < 0 || y0 + h > H || w < 4) continue;
-        var dx = s.shift * amount;
-        ctx.globalCompositeOperation = "source-over";
-        ctx.clearRect(x0, y0, w, h);
-        ctx.drawImage(buf, x0 * dpr, y0 * dpr, w * dpr, h * dpr, x0 + dx, y0, w, h);
-        if (!s.split) continue;
-        // a red copy to one side and a blue-green copy to the other
-        var tw = Math.max(1, Math.round(w * dpr)), th = Math.max(1, Math.round(h * dpr));
-        if (tint.width < tw) tint.width = tw;
-        if (tint.height < th) tint.height = th;
-        var cols = ["#ff2a5f", "#22e0ff"];
-        for (var c = 0; c < 2; c++) {
-          tctx.setTransform(1, 0, 0, 1, 0, 0);
-          tctx.globalCompositeOperation = "source-over";
-          tctx.clearRect(0, 0, tw, th);
-          tctx.drawImage(buf, x0 * dpr, y0 * dpr, tw, th, 0, 0, tw, th);
-          tctx.globalCompositeOperation = "source-in";
-          tctx.fillStyle = cols[c];
-          tctx.fillRect(0, 0, tw, th);
-          tctx.globalCompositeOperation = "multiply";
-          tctx.drawImage(buf, x0 * dpr, y0 * dpr, tw, th, 0, 0, tw, th);
-          ctx.globalCompositeOperation = "screen";
-          ctx.globalAlpha = 0.75 * amount + 0.15;
-          ctx.drawImage(tint, 0, 0, tw, th, x0 + dx + (c ? 1 : -1) * s.split * amount, y0, w, h);
-          ctx.globalAlpha = 1;
+      // 2. the glitch: along the trail, thin rows are torn sideways, some with split colours
+      if (!trail.length) return;
+      var cols = ["#ff2a5f", "#22e0ff"];
+      for (var k = trail.length - 1; k >= 0; k--) {
+        var p = trail[k];
+        p.e -= dt * 1.9;
+        if (p.e <= 0.02) { trail.splice(k, 1); continue; }
+        p.age += dt;
+        if (p.age > 0.06) { p.age = 0; reslice(p); }
+        var amount = p.e * p.e;
+        for (var i = 0; i < p.slices.length; i++) {
+          var s = p.slices[i];
+          var x0 = p.x - s.half, y0 = p.y + s.y, w = s.half * 2, h = s.h;
+          if (y0 < 0 || y0 + h > H || x0 < 0 || x0 + w > W || w < 3) continue;
+          var dx = s.shift * amount;
+          ctx.globalCompositeOperation = "source-over";
+          ctx.clearRect(x0, y0, w, h);
+          ctx.drawImage(buf, x0 * dpr, y0 * dpr, w * dpr, h * dpr, x0 + dx, y0, w, h);
+          if (!s.split) continue;
+          // a red copy to one side and a blue-green copy to the other
+          var tw = Math.max(1, Math.round(w * dpr)), th = Math.max(1, Math.round(h * dpr));
+          if (tint.width < tw) tint.width = tw;
+          if (tint.height < th) tint.height = th;
+          for (var c = 0; c < 2; c++) {
+            tctx.setTransform(1, 0, 0, 1, 0, 0);
+            tctx.globalCompositeOperation = "source-over";
+            tctx.clearRect(0, 0, tw, th);
+            tctx.drawImage(buf, x0 * dpr, y0 * dpr, tw, th, 0, 0, tw, th);
+            tctx.globalCompositeOperation = "source-in";
+            tctx.fillStyle = cols[c];
+            tctx.fillRect(0, 0, tw, th);
+            tctx.globalCompositeOperation = "multiply";
+            tctx.drawImage(buf, x0 * dpr, y0 * dpr, tw, th, 0, 0, tw, th);
+            ctx.globalCompositeOperation = "screen";
+            ctx.globalAlpha = 0.75 * amount + 0.15;
+            ctx.drawImage(tint, 0, 0, tw, th, x0 + dx + (c ? 1 : -1) * s.split * amount, y0, w, h);
+            ctx.globalAlpha = 1;
+          }
         }
       }
     }
@@ -586,6 +620,7 @@
 
   buildIndex("all");
   wireIndex();
+  document.querySelectorAll(".modes__btn, .bar__out, .chip, .index__title, #view-index .index__foot a, .sheet__links a, .walk__intro h1").forEach(glitch);
   buildAbout();
   setMode();
   window.addEventListener("hashchange", setMode);
