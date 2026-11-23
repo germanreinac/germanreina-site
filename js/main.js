@@ -293,6 +293,7 @@
     });
     if (mode === "gallery") requestFog();
     heroOn = mode === "gallery";
+    document.body.dataset.mode = mode; // the bar restyles itself over the dark home page
     if (mode === "index") burst(document.querySelector("#view-index .index__title"));
     if (heroVideo && !reduceMotion) { // only play while the home page is showing
       if (mode === "gallery") { var pl = heroVideo.play(); if (pl && pl.catch) pl.catch(function () {}); }
@@ -444,35 +445,54 @@
     window.addEventListener("resize", size);
     size();
 
-    // The picture glitches in small patches along the path of the pointer or finger.
-    // Each patch fades and shrinks on its own, so moving leaves a short trail behind.
-    var RADIUS = 58, SHIFT = 26, trail = [];
+    // The picture is dragged and torn along the path of the pointer or finger, in the direction
+    // it moves, with red and blue-green fringes. The wake behind it takes about a second to settle.
+    var REACH = 64;      // how far from the path the picture is disturbed, in px
+    var PULL = 0.06;     // how far it is dragged, per px/s of pointer speed
+    var LINGER = 1.9;    // seconds the wake takes to settle
+    var STEP = 10, ROW = 4, CELL = 16, MAX_POINTS = 110;
+    var gx = new Float32Array(0), gy = new Float32Array(0), ga = new Float32Array(0);
+    var trail = [], lastPt = null;
+    var bufR = document.createElement("canvas"), rctx = bufR.getContext("2d");
+    var bufC = document.createElement("canvas"), cctx = bufC.getContext("2d");
     function poke(e) {
       if (reduceMotion) return;
       var r = canvas.getBoundingClientRect();
-      var x = e.clientX - r.left, y = e.clientY - r.top;
-      var head = trail[trail.length - 1];
-      if (head && Math.hypot(head.x - x, head.y - y) < 14) { head.x = x; head.y = y; head.e = 1; return; }
-      trail.push({ x: x, y: y, e: 1, age: 1, slices: [] });
-      if (trail.length > 28) trail.shift();
+      var x = e.clientX - r.left, y = e.clientY - r.top, t = performance.now();
+      if (!lastPt || t - lastPt.t > 250) { lastPt = { x: x, y: y, t: t }; trail.push({ x: x, y: y, vx: 0, vy: 0, life: 1 }); return; }
+      var dx = x - lastPt.x, dy = y - lastPt.y, d = Math.hypot(dx, dy);
+      if (d < STEP) return;
+      var dtp = Math.max(8, t - lastPt.t) / 1000;
+      var vx = dx / dtp, vy = dy / dtp;
+      // fill the gap since the last event, so a fast flick still leaves an unbroken wake
+      var n = Math.min(12, Math.floor(d / STEP));
+      for (var k = 1; k <= n; k++) {
+        trail.push({ x: lastPt.x + (dx * k) / n, y: lastPt.y + (dy * k) / n, vx: vx, vy: vy, life: 1 });
+      }
+      if (trail.length > MAX_POINTS) trail.splice(0, trail.length - MAX_POINTS);
+      lastPt = { x: x, y: y, t: t };
     }
     var hero = document.getElementById("hero");
     hero.addEventListener("pointermove", poke);
-    hero.addEventListener("pointerdown", poke);
+    hero.addEventListener("pointerdown", function (e) { lastPt = null; poke(e); });
 
-    function reslice(p) {
-      p.slices = [];
-      var r = RADIUS * (0.45 + 0.55 * p.e), n = 3 + Math.floor(Math.random() * 5 * p.e + 1);
-      for (var i = 0; i < n; i++) {
-        var y = (Math.random() * 2 - 1) * r;
-        p.slices.push({
-          y: y,
-          h: 1.5 + Math.random() * Math.random() * 12,
-          half: Math.sqrt(r * r - y * y),
-          shift: (Math.random() * 2 - 1) * SHIFT,
-          split: Math.random() < 0.5 ? 3 + Math.random() * 7 : 0
-        });
-      }
+    // cheap repeatable noise, so torn rows hold for a few frames instead of fizzing
+    function noise(a, b) {
+      var s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+      return s - Math.floor(s);
+    }
+    // one copy of the frame in each fringe colour, made once per frame
+    function tinted(c2d, cv, colour) {
+      if (cv.width !== buf.width || cv.height !== buf.height) { cv.width = buf.width; cv.height = buf.height; }
+      c2d.setTransform(1, 0, 0, 1, 0, 0);
+      c2d.globalCompositeOperation = "source-over";
+      c2d.clearRect(0, 0, cv.width, cv.height);
+      c2d.drawImage(buf, 0, 0);
+      c2d.globalCompositeOperation = "source-atop";
+      c2d.fillStyle = colour;
+      c2d.fillRect(0, 0, cv.width, cv.height);
+      c2d.globalCompositeOperation = "multiply";
+      c2d.drawImage(buf, 0, 0);
     }
 
     function draw(now) {
@@ -487,69 +507,92 @@
       ctx.clearRect(0, 0, W, H);
       if (!src) return;
 
-      // 1. the clean frame, with the clip's own backdrop faded away around the figure
+      // 1. the clean frame
       var sw = src.videoWidth || src.naturalWidth, sh = src.videoHeight || src.naturalHeight;
       var tall = W / H < 0.8;
       // the figure sits in the middle of the screen; on a tall screen it is drawn smaller so it fits under the name
       var scale = Math.max(W / sw, H / sh) * (tall ? 0.74 : 1);
       var cx = W * 0.5, cy = H * (tall ? 0.56 : 0.5);
       bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      bctx.globalCompositeOperation = "source-over";
       bctx.clearRect(0, 0, W, H);
       bctx.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
-      var rx = sh * scale * 0.42, ry = sh * scale * 0.56;
-      bctx.globalCompositeOperation = "destination-in";
-      bctx.save();
-      bctx.translate(cx, cy);
-      bctx.scale(rx / ry, 1);
-      var g = bctx.createRadialGradient(0, 0, ry * 0.45, 0, 0, ry);
-      g.addColorStop(0, "rgba(0,0,0,1)");
-      g.addColorStop(1, "rgba(0,0,0,0)");
-      bctx.fillStyle = g;
-      bctx.fillRect(-ry * 2, -ry * 2, ry * 4, ry * 4);
-      bctx.restore();
       ctx.drawImage(buf, 0, 0, W, H);
 
-      // 2. the glitch: along the trail, thin rows are torn sideways, some with split colours
-      if (!trail.length) return;
-      var cols = ["#ff2a5f", "#22e0ff"];
-      for (var k = trail.length - 1; k >= 0; k--) {
-        var p = trail[k];
-        p.e -= dt * 1.9;
-        if (p.e <= 0.02) { trail.splice(k, 1); continue; }
-        p.age += dt;
-        if (p.age > 0.06) { p.age = 0; reslice(p); }
-        var amount = p.e * p.e;
-        for (var i = 0; i < p.slices.length; i++) {
-          var s = p.slices[i];
-          var x0 = p.x - s.half, y0 = p.y + s.y, w = s.half * 2, h = s.h;
-          if (y0 < 0 || y0 + h > H || x0 < 0 || x0 + w > W || w < 3) continue;
-          var dx = s.shift * amount;
-          ctx.globalCompositeOperation = "source-over";
-          ctx.clearRect(x0, y0, w, h);
-          ctx.drawImage(buf, x0 * dpr, y0 * dpr, w * dpr, h * dpr, x0 + dx, y0, w, h);
-          if (!s.split) continue;
-          // a red copy to one side and a blue-green copy to the other
-          var tw = Math.max(1, Math.round(w * dpr)), th = Math.max(1, Math.round(h * dpr));
-          if (tint.width < tw) tint.width = tw;
-          if (tint.height < th) tint.height = th;
-          for (var c = 0; c < 2; c++) {
-            tctx.setTransform(1, 0, 0, 1, 0, 0);
-            tctx.globalCompositeOperation = "source-over";
-            tctx.clearRect(0, 0, tw, th);
-            tctx.drawImage(buf, x0 * dpr, y0 * dpr, tw, th, 0, 0, tw, th);
-            tctx.globalCompositeOperation = "source-in";
-            tctx.fillStyle = cols[c];
-            tctx.fillRect(0, 0, tw, th);
-            tctx.globalCompositeOperation = "multiply";
-            tctx.drawImage(buf, x0 * dpr, y0 * dpr, tw, th, 0, 0, tw, th);
-            ctx.globalCompositeOperation = "screen";
-            ctx.globalAlpha = 0.75 * amount + 0.15;
-            ctx.drawImage(tint, 0, 0, tw, th, x0 + dx + (c ? 1 : -1) * s.split * amount, y0, w, h);
-            ctx.globalAlpha = 1;
+      // 2. the wake. Every live point on the path adds its pull to a coarse grid of cells, so
+      //    overlapping points build up instead of overwriting each other.
+      while (trail.length && trail[0].life <= 0) trail.shift();
+      if (trail.length) {
+        var cols = Math.ceil(W / CELL), rows = Math.ceil(H / ROW);
+        if (gx.length !== cols * rows) { gx = new Float32Array(cols * rows); gy = new Float32Array(cols * rows); ga = new Float32Array(cols * rows); }
+        var c0 = cols, c1 = -1, r0 = rows, r1 = -1;
+        for (var k = 0; k < trail.length; k++) {
+          var p = trail[k];
+          p.life -= dt / LINGER;
+          if (p.life <= 0) continue;
+          var ease = p.life * p.life * (3 - 2 * p.life);       // settles gently at the end
+          var reach = REACH * (0.4 + 0.6 * ease);
+          var speed = Math.hypot(p.vx, p.vy);
+          var drag = Math.min(60, 10 + speed * PULL) * ease;
+          var ux = speed > 1 ? p.vx / speed : 1, uy = speed > 1 ? p.vy / speed : 0;
+          var ca = Math.max(0, Math.floor((p.x - reach) / CELL)), cb = Math.min(cols - 1, Math.floor((p.x + reach) / CELL));
+          var ra = Math.max(0, Math.floor((p.y - reach) / ROW)), rb = Math.min(rows - 1, Math.floor((p.y + reach) / ROW));
+          for (var r = ra; r <= rb; r++) {
+            var oy = (r + 0.5) * ROW - p.y;
+            for (var c = ca; c <= cb; c++) {
+              var ox = (c + 0.5) * CELL - p.x;
+              var f = 1 - (ox * ox + oy * oy) / (reach * reach);   // strongest on the path
+              if (f <= 0) continue;
+              var id = r * cols + c;
+              gx[id] += ux * drag * f * 0.5;
+              gy[id] += uy * drag * f * 0.2;
+              if (ease * f > ga[id]) ga[id] = ease * f;
+            }
+          }
+          if (ca < c0) c0 = ca;
+          if (cb > c1) c1 = cb;
+          if (ra < r0) r0 = ra;
+          if (rb > r1) r1 = rb;
+        }
+        if (c1 >= c0) {
+          tinted(rctx, bufR, "#ff0000");
+          tinted(cctx, bufC, "#00ffff");
+          var tick = Math.floor(now / 80);
+          for (var r = r0; r <= r1; r++) {
+            var n1 = noise(r, tick), tear = n1 > 0.88 ? 2.4 : 1;   // now and then a whole row jumps further
+            var y0 = r * ROW;
+            for (var c = c0; c <= c1; c++) {
+              var id = r * cols + c, a = ga[id];
+              if (a <= 0) continue;
+              var dx = Math.max(-90, Math.min(90, (gx[id] + (n1 - 0.5) * 22 * a) * tear));
+              var dy = Math.max(-30, Math.min(30, gy[id]));
+              var fringe = (2 + Math.abs(dx) * 0.22) * Math.min(1, a * 1.5);
+              gx[id] = gy[id] = ga[id] = 0;
+              var x0 = c * CELL, sx = x0 - dx, sy = y0 - dy;
+              // The red part of the picture and the blue-green part are drawn separately, pulled apart.
+              // Added together they give back the original exactly, so a settled cell leaves no mark.
+              ctx.globalCompositeOperation = "source-over";
+              ctx.clearRect(x0, y0, CELL, ROW);
+              ctx.globalCompositeOperation = "lighter";
+              ctx.drawImage(bufR, (sx + fringe) * dpr, sy * dpr, CELL * dpr, ROW * dpr, x0, y0, CELL, ROW);
+              ctx.drawImage(bufC, (sx - fringe) * dpr, sy * dpr, CELL * dpr, ROW * dpr, x0, y0, CELL, ROW);
+            }
           }
         }
       }
+
+      // 3. fade the clip's own backdrop away around the figure
+      var rx = sh * scale * 0.42, ry = sh * scale * 0.56;
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(rx / ry, 1);
+      var g = ctx.createRadialGradient(0, 0, ry * 0.45, 0, 0, ry);
+      g.addColorStop(0, "rgba(0,0,0,1)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-ry * 3, -ry * 3, ry * 6, ry * 6);
+      ctx.restore();
+      ctx.globalCompositeOperation = "source-over";
     }
     requestAnimationFrame(draw);
 
