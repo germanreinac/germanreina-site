@@ -398,37 +398,52 @@
     intro.appendChild(el("h1", null, site.name));
     intro.appendChild(el("p", null, site.intro));
     document.getElementById("hint").textContent = site.motto || "";
-    var touch = window.matchMedia("(pointer: coarse)").matches;
-    document.getElementById("room-count").textContent = reduceMotion ? "" : (touch ? "rub him with your finger" : "run the pointer over him");
+    document.getElementById("room-count").textContent = "";
 
     var poster = new Image();
     poster.src = heroVideo.getAttribute("poster");
-    var W = 0, H = 0, dpr = 1, dust = [], last = performance.now();
+    var W = 0, H = 0, dpr = 1, last = performance.now();
+    // the clean frame is drawn here first, then copied to the visible canvas with the glitch applied
+    var buf = document.createElement("canvas"), bctx = buf.getContext("2d");
+    var tint = document.createElement("canvas"), tctx = tint.getContext("2d");
 
     function size() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       W = canvas.clientWidth;
       H = canvas.clientHeight;
-      canvas.width = Math.round(W * dpr);
-      canvas.height = Math.round(H * dpr);
+      canvas.width = buf.width = Math.round(W * dpr);
+      canvas.height = buf.height = Math.round(H * dpr);
     }
     window.addEventListener("resize", size);
     size();
 
-    // Where the pointer passes, the figure breaks into dust that drifts up and then grows back.
-    function rub(e) {
+    // The picture glitches in a patch around the pointer or finger, and settles when it stops moving.
+    var RADIUS = 150, px = 0, py = 0, energy = 0, slices = [], sliceAge = 1;
+    function poke(e) {
       if (reduceMotion) return;
       var r = canvas.getBoundingClientRect();
-      var x = e.clientX - r.left, y = e.clientY - r.top;
-      for (var i = 0; i < 7; i++) {
-        var a = Math.random() * 6.283, d = Math.random() * 46;
-        dust.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, r: 7 + Math.random() * 34, life: 1, fade: 0.28 + Math.random() * 0.4, vx: (Math.random() - 0.5) * 26, vy: -10 - Math.random() * 34 });
-      }
-      if (dust.length > 700) dust.splice(0, dust.length - 700);
+      px = e.clientX - r.left;
+      py = e.clientY - r.top;
+      energy = 1;
     }
     var hero = document.getElementById("hero");
-    hero.addEventListener("pointermove", rub);
-    hero.addEventListener("pointerdown", rub);
+    hero.addEventListener("pointermove", poke);
+    hero.addEventListener("pointerdown", poke);
+
+    function reslice() {
+      slices = [];
+      var n = 10 + Math.floor(Math.random() * 10);
+      for (var i = 0; i < n; i++) {
+        var y = (Math.random() * 2 - 1) * RADIUS;
+        slices.push({
+          y: y,
+          h: 2 + Math.random() * Math.random() * 30,
+          half: Math.sqrt(RADIUS * RADIUS - y * y),
+          shift: (Math.random() * 2 - 1) * 70,
+          split: Math.random() < 0.45 ? 6 + Math.random() * 16 : 0
+        });
+      }
+    }
 
     function draw(now) {
       requestAnimationFrame(draw);
@@ -441,37 +456,65 @@
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, W, H);
       if (!src) return;
+
+      // 1. the clean frame, with the clip's own backdrop faded away around the figure
       var sw = src.videoWidth || src.naturalWidth, sh = src.videoHeight || src.naturalHeight;
       var tall = W / H < 0.8;
       // the figure sits in the middle of the screen; on a tall screen it is drawn smaller so it fits under the name
       var scale = Math.max(W / sw, H / sh) * (tall ? 0.74 : 1);
       var cx = W * 0.5, cy = H * (tall ? 0.56 : 0.5);
-      ctx.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
-      // fade the clip's own backdrop away around the figure
+      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      bctx.globalCompositeOperation = "source-over";
+      bctx.clearRect(0, 0, W, H);
+      bctx.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
       var rx = sh * scale * 0.42, ry = sh * scale * 0.56;
-      ctx.globalCompositeOperation = "destination-in";
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.scale(rx / ry, 1);
-      var g = ctx.createRadialGradient(0, 0, ry * 0.45, 0, 0, ry);
+      bctx.globalCompositeOperation = "destination-in";
+      bctx.save();
+      bctx.translate(cx, cy);
+      bctx.scale(rx / ry, 1);
+      var g = bctx.createRadialGradient(0, 0, ry * 0.45, 0, 0, ry);
       g.addColorStop(0, "rgba(0,0,0,1)");
       g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = g;
-      ctx.fillRect(-ry * 2, -ry * 2, ry * 4, ry * 4);
-      ctx.restore();
-      // the dust eats holes in it
-      ctx.globalCompositeOperation = "destination-out";
-      for (var i = dust.length - 1; i >= 0; i--) {
-        var p = dust[i];
-        p.life -= p.fade * dt;
-        if (p.life <= 0) { dust.splice(i, 1); continue; }
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        var gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-        gr.addColorStop(0, "rgba(0,0,0," + Math.min(1, p.life * 1.4).toFixed(2) + ")");
-        gr.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = gr;
-        ctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+      bctx.fillStyle = g;
+      bctx.fillRect(-ry * 2, -ry * 2, ry * 4, ry * 4);
+      bctx.restore();
+      ctx.drawImage(buf, 0, 0, W, H);
+
+      // 2. the glitch: rows inside the patch are torn sideways, some with split colours
+      if (energy <= 0.01) return;
+      energy = Math.max(0, energy - dt * 1.6);
+      sliceAge += dt;
+      if (sliceAge > 0.055) { sliceAge = 0; reslice(); }
+      var amount = energy * energy;
+      for (var i = 0; i < slices.length; i++) {
+        var s = slices[i];
+        var x0 = px - s.half, y0 = py + s.y, w = s.half * 2, h = s.h;
+        if (y0 < 0 || y0 + h > H || w < 4) continue;
+        var dx = s.shift * amount;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.clearRect(x0, y0, w, h);
+        ctx.drawImage(buf, x0 * dpr, y0 * dpr, w * dpr, h * dpr, x0 + dx, y0, w, h);
+        if (!s.split) continue;
+        // a red copy to one side and a blue-green copy to the other
+        var tw = Math.max(1, Math.round(w * dpr)), th = Math.max(1, Math.round(h * dpr));
+        if (tint.width < tw) tint.width = tw;
+        if (tint.height < th) tint.height = th;
+        var cols = ["#ff2a5f", "#22e0ff"];
+        for (var c = 0; c < 2; c++) {
+          tctx.setTransform(1, 0, 0, 1, 0, 0);
+          tctx.globalCompositeOperation = "source-over";
+          tctx.clearRect(0, 0, tw, th);
+          tctx.drawImage(buf, x0 * dpr, y0 * dpr, tw, th, 0, 0, tw, th);
+          tctx.globalCompositeOperation = "source-in";
+          tctx.fillStyle = cols[c];
+          tctx.fillRect(0, 0, tw, th);
+          tctx.globalCompositeOperation = "multiply";
+          tctx.drawImage(buf, x0 * dpr, y0 * dpr, tw, th, 0, 0, tw, th);
+          ctx.globalCompositeOperation = "screen";
+          ctx.globalAlpha = 0.75 * amount + 0.15;
+          ctx.drawImage(tint, 0, 0, tw, th, x0 + dx + (c ? 1 : -1) * s.split * amount, y0, w, h);
+          ctx.globalAlpha = 1;
+        }
       }
     }
     requestAnimationFrame(draw);
