@@ -993,9 +993,22 @@
       if (held) grabAt = pt;
     });
     function letGo(e) {
+      var gone = touches[e.pointerId];
       delete touches[e.pointerId];
       if (!held) return;
-      if (pinch) { // let go of a stretch: it snaps back and wobbles
+      if (pinch) { // let go of a stretch: it snaps back like rubber, and flies off towards the finger that is still holding
+        var left = touches[Object.keys(touches)[0]], pull = head.pk - 1;
+        if (head && gone && left && pull > 0.2) {
+          var sdx = left.x - gone.x, sdy = left.y - gone.y, sl = Math.hypot(sdx, sdy) || 1;
+          var sp = Math.min(26, pull * 12);
+          head.vel.set((sdx / sl) * sp, Math.min(10, 3 + sp * 0.3), (sdy / sl) * sp); // down the screen is towards you on the floor
+          head.pk = Math.min(head.pk, 2.2); // the stretch whips back past round and wobbles, without overshooting far enough to burst
+          head.pkv = -2;
+          head.sv += sp * 0.25;
+          strain += Math.min(0.12, pull * 0.04);
+          head.proj.copy(head.pos).project(head.camera);
+          spark((head.proj.x + 1) / 2 * W, (1 - head.proj.y) / 2 * H, Math.min(12, Math.round(5 + pull * 3)), head.rpx * 1.2, 700 + sp * 30, 0.5);
+        }
         pinch = null;
         held = false;
         grabAt = null;
