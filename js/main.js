@@ -1498,7 +1498,7 @@
     if (!view || !items) return;
     view.classList.add("is-wheel");
     var list = document.getElementById("play-list"), frame = document.getElementById("play-frame");
-    var shot = document.getElementById("play-shot"), cap = document.getElementById("play-cap"), go = document.getElementById("play-go");
+    var shot = document.getElementById("play-shot"), cap = document.getElementById("play-cap"), go = document.getElementById("play-go"), nowEl = document.getElementById("play-now");
     var SLOTS = Math.ceil(30 / items.length) * items.length;  // the list repeats until the rim is full
     var STEP = (Math.PI * 2) / SLOTS, GAP = 0.2;              // GAP: how far neighbours part around a chosen name
     var nodes = [], active = -1, opened = false, rot = 0, rotTo = 0, spinning = false;
@@ -1591,6 +1591,7 @@
       view.classList.toggle("has-active", k >= 0);
       if (k < 0) { // close: the thumbnail fades and the neighbours come back together
         opened = false;
+        if (nowEl) nowEl.classList.remove("is-on");
         go.removeAttribute("href");
         tw = { t0: pickedAt, d: CLOSE, g0: gap, g1: 0 };
         idleAt = pickedAt + 900;
@@ -1606,6 +1607,12 @@
       shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
       cap.textContent = it.domain + " · " + it.note + (it.url ? (hoverable ? " · click to open" : " · tap to open") : " · not live yet");
       if (it.url) go.href = it.url; else go.removeAttribute("href");
+      if (nowEl) { // the heading reads "Play <name>" while its preview is open
+        nowEl.classList.remove("is-on");
+        nowEl.textContent = it.domain;
+        void nowEl.offsetWidth;
+        nowEl.classList.add("is-on");
+      }
       // The frame starts as a bar exactly the size of the word, where the word is now, and ends
       // full size where the word is headed: the front of the wheel, in the middle of the view.
       var r = nodes[k].getBoundingClientRect(), vr = view.getBoundingClientRect(), lr = list.getBoundingClientRect();
