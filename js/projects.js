@@ -16,6 +16,7 @@ window.SITE = {
   //   "Stay creative, stay weird."   (germanreina.com, artdiscipline.com)
   //   "Creative Vision and Art Direction for Video Games and Animation."   (Notion bio)
   intro: "Art Director from Lanzarote. Creator of the art for OlliOlli World. Artist at Supercell.",
+  nameHint: "who's this? ↓", // small line above the name on the home page; it and the name open About
   motto: "Stay creative, stay weird.",
   email: "germanrc3@hotmail.com",
   portfolio: { label: "ArtStation", url: "https://www.artstation.com/germanreina" },

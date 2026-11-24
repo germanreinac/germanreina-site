@@ -1060,3 +1060,17 @@ main { flex: 1; min-height: 0; position: relative; }
   .fog i { animation: none; }
   .piece, .frame { transition: none; }
 }
+
+/* the small line above the name on the home page: says the name is a way in */
+.walk__tip {
+  display: inline-block;
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  text-decoration: none;
+  pointer-events: auto;
+}
+.walk__tip:hover { text-decoration: underline; }
+.gallery.is-skull .walk__tip { opacity: 0; pointer-events: none; }

@@ -4,9 +4,9 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 ## The site (`index.html`)
 
-Three views, switched from the bar at the top. They are labelled Living, Work and Play; in the code and the addresses they are still `gallery`, `index` and `play`. The switch is a slider: click a name, or drag the pill along the track and let go.
+Three views, switched from the bar at the top. They are labelled Home, Work and Play; in the code and the addresses they are still `gallery`, `index` and `play`. The switch is a slider: click a name, or drag the pill along the track and let go.
 
-- **Living** (`#gallery`): the home page. Your name and the line under it beside the looping Ra video from the current site, centred. The picture is dragged and torn along the path of the pointer or finger, with split colours, leaving a wake that takes a couple of seconds to settle. Titles and links across the site play the same glitch, briefly, when the pointer reaches them. This stands in for the interactive gallery until its art is made.
+- **Home** (`#gallery`): the home page. Your name and the line under it beside the looping Ra video from the current site, centred. The picture is dragged and torn along the path of the pointer or finger, with split colours, leaving a wake that takes a couple of seconds to settle. Titles and links across the site play the same glitch, briefly, when the pointer reaches them. This stands in for the interactive gallery until its art is made.
 - **Work** (`#index`): a plain list of projects with filters. Each row opens a sheet with the facts; images are on ArtStation for now.
 
 - **Play** (`#play`): the interactive sites and games, in the same light style as the Index. The names sit on the rim of a big wheel seen almost edge-on: the front runs down a diagonal, the far side shows behind, soft and faint, and scrolling spins it without end. Picking a name (pointing with a mouse, or a tap) turns it to the middle while the neighbours part and the name grows into its thumbnail, all in one movement. A click, or a tap on the thumbnail, opens the site. Left alone, the wheel keeps turning very slowly; a finger on it or an open preview holds it still. The earlier flat staircase is still at `#play-flat` (reload the page on that address). Entries are the `play` list in `js/projects.js`; previews go in `images/play/`.

@@ -485,6 +485,11 @@
     nameLink.title = "About";
     nameLink.addEventListener("click", function () { location.hash = "about"; });
     nameLink.addEventListener("keydown", function (e) { if (e.key === "Enter") location.hash = "about"; });
+    if (site.nameHint) { // a small line above the name, saying it can be clicked
+      var hintLink = el("a", "walk__tip", site.nameHint);
+      hintLink.href = "#about";
+      intro.appendChild(hintLink);
+    }
     intro.appendChild(nameLink);
     intro.appendChild(el("p", null, site.intro));
     document.getElementById("hint").textContent = site.motto || "";
