@@ -1510,13 +1510,16 @@
     var hoverable = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
     function wrap(a) { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; }
+    var SMALL = 0.62; // with a preview open the whole wheel shrinks to this and waits behind it, still there to scroll
     function layout() {
+      var sc = 1 - (1 - SMALL) * gap;
+      if (sc !== list._sc) { list._sc = sc; list.style.transform = sc < 1 ? "scale(" + sc.toFixed(4) + ")" : "none"; }
       for (var k = 0; k < SLOTS; k++) {
         var n = nodes[k], th = wrap(k * STEP - rot);
         var depth = Math.cos(th), y = R * Math.sin(th);
         var x = y * slope + (1 - depth) * R * 0.38; // the far side of the rim sits off to the right, so the wheel reads as a ring
         if (gapK >= 0 && k !== gapK && gap > 0) { // the names before and after slide apart along the diagonal, leaving room for the thumbnail
-          var push = (wrap((k - gapK) * STEP) > 0 ? spread + lineH * 0.75 + 14 : -spread) * gap; // the ones below also clear the caption
+          var push = (wrap((k - gapK) * STEP) > 0 ? spread + lineH * 0.75 + 14 : -spread) * gap / sc; // measured on screen, so undo the wheel's own shrink // the ones below also clear the caption
           y += push;
           x += push * slope * 0.6;
         }
@@ -1691,6 +1694,8 @@
       list.style.fontSize = size + "px";
       list.style.perspective = Math.round(R * 4.2) + "px";
       list.style.perspectiveOrigin = ax + "px " + ay + "px";
+      list.style.transformOrigin = (w / 2) + "px " + ay + "px"; // it shrinks towards the middle, where the thumbnail opens
+      if (nowEl) nowEl.style.fontSize = size + "px";              // the name after "Play" is the size it has on the wheel
       spread = Math.max(0, frame.offsetWidth * 0.3125 - lineH * 0.3); // the name before ends up just above the thumbnail, the name after just below its caption
       layout();
       kick();

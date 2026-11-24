@@ -685,8 +685,8 @@ main { flex: 1; min-height: 0; position: relative; }
   font-size: 0.75rem;
   cursor: pointer;
 }
-.daybtn__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--paper); }
-.daybtn[aria-pressed="true"] .daybtn__dot { background: var(--accent); }
+.daybtn__skull { flex: none; color: var(--paper); }
+.daybtn[aria-pressed="true"] .daybtn__skull { color: var(--accent); }
 .daybtn:hover { border-color: var(--accent); color: var(--accent); }
 .daybtn:focus-visible { outline-color: var(--star); }
 /* skull mode: a touch darker, the name out of focus so the skull has the stage */
@@ -829,7 +829,7 @@ main { flex: 1; min-height: 0; position: relative; }
 }
 .play__tag { display: none; }
 /* ---- the wheel ---- */
-.play.is-wheel .play__list { display: block; transition: none; transform: none; transform-style: preserve-3d; pointer-events: none; } /* names set back in depth would otherwise sit behind the list's own surface and miss the pointer */
+.play.is-wheel .play__list { display: block; transition: none; transform-style: preserve-3d; pointer-events: none; } /* names set back in depth would otherwise sit behind the list's own surface and miss the pointer */
 .play.is-wheel .play__item {
   position: absolute;
   left: 0;
@@ -1078,5 +1078,5 @@ main { flex: 1; min-height: 0; position: relative; }
 
 @media (max-width: 720px) { :root { --edge: var(--gutter-l); --edge-r: var(--gutter-r); } }
 /* the name being previewed, written after "Play" in the heading */
-.play__now { display: inline-block; opacity: 0; transform: translateX(-10px); filter: blur(4px); transition: opacity 0.2s ease, transform 0.2s ease, filter 0.2s ease; }
+.play__now { display: inline-block; margin-left: 0.25em; letter-spacing: -0.045em; vertical-align: baseline; opacity: 0; transform: translateX(-10px); filter: blur(4px); transition: opacity 0.2s ease, transform 0.2s ease, filter 0.2s ease; }
 .play__now.is-on { opacity: 1; transform: none; filter: none; transition: opacity 0.4s ease 0.1s, transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s, filter 0.4s ease 0.1s; }
