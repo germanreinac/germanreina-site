@@ -334,6 +334,7 @@
       if (b.dataset.mode === mode) b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
     });
+    if (switchRest) switchRest();
     if (mode === "gallery") requestFog();
     heroOn = mode === "gallery";
     document.body.dataset.mode = mode;
@@ -1376,6 +1377,74 @@
     startHomes();
   }
   /* About: bio, contact, links, experience and talks, from js/projects.js */
+  /* The switch in the bar is a real slider: a pill sits under the current page's name and glides to
+     the next one. It can also be grabbed and dragged along the track; letting go drops it on the
+     nearest name and goes to that page. */
+  var switchRest = null;
+  function wireSwitch() {
+    var modes = document.querySelector(".bar .modes");
+    if (!modes) return;
+    var btns = [].slice.call(modes.querySelectorAll(".modes__btn"));
+    var thumb = el("span", "modes__thumb");
+    thumb.setAttribute("aria-hidden", "true");
+    modes.insertBefore(thumb, modes.firstChild);
+    var drag = null, moved = false, placed = false;
+    function current() { return modes.querySelector('.modes__btn[aria-current="page"]'); }
+    function put(x, w, under) {
+      thumb.style.width = w + "px";
+      thumb.style.transform = "translateX(" + x.toFixed(1) + "px)";
+      btns.forEach(function (b) { b.classList.toggle("is-under", b === under); });
+    }
+    switchRest = function () {
+      var b = current();
+      modes.classList.toggle("has-thumb", !!b);
+      if (!b) { btns.forEach(function (o) { o.classList.remove("is-under"); }); return; }
+      if (!placed) { thumb.style.transition = "none"; put(b.offsetLeft, b.offsetWidth, b); void thumb.offsetWidth; thumb.style.transition = ""; placed = true; }
+      else put(b.offsetLeft, b.offsetWidth, b);
+    };
+    window.addEventListener("resize", switchRest);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { placed = false; switchRest(); });
+    btns.forEach(function (b) { b.draggable = false; });
+    modes.addEventListener("pointerdown", function (e) {
+      if (e.button || !current()) return;
+      drag = { id: e.pointerId, x0: e.clientX, t0: current().offsetLeft, near: current() };
+      moved = false;
+      modes.classList.add("is-pressed"); // the pill gives a little under the finger
+    });
+    window.addEventListener("pointermove", function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      var dx = e.clientX - drag.x0;
+      if (!moved) {
+        if (Math.abs(dx) < 6) return;
+        moved = true;
+        modes.classList.add("is-dragging");
+        try { modes.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+      var first = btns[0], last = btns[btns.length - 1], w = thumb.offsetWidth;
+      var min = first.offsetLeft, max = last.offsetLeft + last.offsetWidth - w, x = drag.t0 + dx;
+      if (x < min) x = min - Math.min(3, (min - x) * 0.1); // it stops at either end of the track, with only a hair of give
+      if (x > max) x = max + Math.min(3, (x - max) * 0.1);
+      var mid = x + w / 2, near = first, best = 1e9;
+      btns.forEach(function (b) { var d = Math.abs(b.offsetLeft + b.offsetWidth / 2 - mid); if (d < best) { best = d; near = b; } });
+      drag.near = near;
+      put(x, near.offsetWidth, near);
+    });
+    function drop(e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      var near = drag.near, was = moved;
+      drag = null;
+      modes.classList.remove("is-pressed", "is-dragging");
+      if (!was) return;
+      setTimeout(function () { moved = false; }, 60); // long enough to swallow the click that ends the drag
+      if (near !== current()) location.hash = near.getAttribute("href");
+      else switchRest();
+    }
+    window.addEventListener("pointerup", drop);
+    window.addEventListener("pointercancel", drop);
+    modes.addEventListener("click", function (e) { if (moved) { e.preventDefault(); e.stopPropagation(); } }, true);
+    modes.addEventListener("dragstart", function (e) { e.preventDefault(); });
+  }
+
   function buildAbout() {
     var about = site.about;
     if (!about || !document.getElementById("view-about")) return;
@@ -1806,6 +1875,7 @@
   buildIndex("all");
   wireIndex();
   (location.hash === "#play-flat" ? buildPlayFlat : buildPlayWheel)();
+  wireSwitch();
   document.querySelectorAll(".modes__btn, .index__title, .walk__intro h1").forEach(glitch); // titles and the switch only
   buildAbout();
   setMode();

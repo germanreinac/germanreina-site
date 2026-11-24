@@ -82,7 +82,26 @@ button { font: inherit; color: inherit; }
   font-size: 0.78rem;
   text-decoration: none;
 }
-.modes__btn[aria-current="page"] { background: var(--ink); color: var(--paper); }
+.modes { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+.modes.is-dragging, .modes.is-dragging .modes__btn { cursor: grabbing; }
+.modes__btn { position: relative; z-index: 1; transition: color 0.2s ease; -webkit-tap-highlight-color: transparent; }
+.modes__btn.is-under { color: var(--paper); }
+.modes__thumb { /* the pill that slides along the track; it overshoots a touch and settles */
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.45s cubic-bezier(0.3, 1.4, 0.5, 1), width 0.3s ease, scale 0.16s ease, opacity 0.2s ease;
+}
+.modes.has-thumb .modes__thumb { opacity: 1; }
+.modes.is-pressed .modes__thumb { scale: 0.93; }
+.modes.is-dragging .modes__thumb { transition: width 0.16s ease, scale 0.16s ease; scale: 1.04 0.92; }
+@media (prefers-reduced-motion: reduce) { .modes__thumb { transition: opacity 0.2s ease; } }
 .bar { display: grid; grid-template-columns: 1fr auto 1fr; }
 .bar .modes { grid-column: 2; }
 .bar__out { grid-column: 3; justify-self: end; }
@@ -98,7 +117,8 @@ body[data-float] .bar {
 }
 body[data-dark] .bar { color: var(--star); }
 body[data-dark] .modes { border-color: rgba(236, 238, 234, 0.35); background: rgba(23, 21, 29, 0.35); backdrop-filter: blur(6px); }
-body[data-dark] .modes__btn[aria-current="page"] { background: var(--star); color: var(--ink); }
+body[data-dark] .modes__thumb { background: var(--star); }
+body[data-dark] .modes__btn.is-under { color: var(--ink); }
 body[data-dark] .bar .glitch.is-glitching::after { mix-blend-mode: screen; }
 body[data-dark] .bar :focus-visible { outline-color: var(--star); }
 @media (max-width: 520px) {

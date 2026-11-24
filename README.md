@@ -4,7 +4,7 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 ## The site (`index.html`)
 
-Three views, switched from the bar at the top (Gallery, Index, Play):
+Three views, switched from the bar at the top (Gallery, Index, Play). The switch is a slider: click a name, or drag the pill along the track and let go.
 
 - **Gallery** (`#gallery`): the home page. Your name and the line under it beside the looping Ra video from the current site, centred. The picture is dragged and torn along the path of the pointer or finger, with split colours, leaving a wake that takes a couple of seconds to settle. Titles and links across the site play the same glitch, briefly, when the pointer reaches them. This stands in for the interactive gallery until its art is made.
 - **Index** (`#index`): a plain list of projects with filters. Each row opens a sheet with the facts; images are on ArtStation for now.
