@@ -193,8 +193,6 @@
         r.appendChild(el("span", "row__year", p.year || "—"));
         var t = el("span", "row__title", p.title);
         r.appendChild(t);
-        glitch(t);
-        r.addEventListener("pointerenter", function () { burst(t); });
         r.appendChild(el("span", "row__role", p.role));
         r.appendChild(el("span", "row__with", p.with));
         r.appendChild(el("span", "row__go", "→"));
@@ -299,6 +297,7 @@
     setBar();
     if (mode === "play" && window.__playShown) { window.__playShown(); burst(document.querySelector("#view-play .index__title")); }
     if (mode === "index") burst(document.querySelector("#view-index .index__title"));
+    if (mode === "about") burst(document.querySelector("#view-about .index__title"));
     if (heroVideo && !reduceMotion) { // only play while the home page is showing
       if (mode === "gallery") { var pl = heroVideo.play(); if (pl && pl.catch) pl.catch(function () {}); }
       else heroVideo.pause();
@@ -436,7 +435,13 @@
     var intro = document.getElementById("hero-intro"), stage = document.getElementById("hero-stage");
     var canvas = document.getElementById("hero-canvas"), ctx = canvas.getContext("2d");
     heroVideo = document.getElementById("hero-video");
-    intro.appendChild(el("h1", null, site.name));
+    var nameLink = el("h1", null, site.name); // the name is the way into About
+    nameLink.setAttribute("role", "link");
+    nameLink.tabIndex = 0;
+    nameLink.title = "About";
+    nameLink.addEventListener("click", function () { location.hash = "about"; });
+    nameLink.addEventListener("keydown", function (e) { if (e.key === "Enter") location.hash = "about"; });
+    intro.appendChild(nameLink);
     intro.appendChild(el("p", null, site.intro));
     document.getElementById("hint").textContent = site.motto || "";
     document.getElementById("room-count").textContent = "";
@@ -596,7 +601,12 @@
         ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), hit: new THREE.Vector3(), proj: new THREE.Vector3(),
         plane: new THREE.Plane(new THREE.Vector3(0, 1, 0), -(REST + 0.45)),
         s: 1, sv: 0,      // jelly: how tall it is against its normal height, and how fast that is changing
-        wide: 1,          // sideways stretch from two fingers
+        // jelly detail: it leans back against the way it is moving, stretches along its path,
+        // and can be pulled between two fingers along any line
+        shx: 0, shz: 0, shvx: 0, shvz: 0,          // lean (shear), and how fast it is changing
+        kd: 1, dir: new THREE.Vector3(1, 0, 0),    // stretch along the direction of travel
+        pk: 1, pkv: 0, pdir: new THREE.Vector3(1, 0, 0), // stretch between two fingers, and its line
+        mat: new THREE.Matrix4(), m2: new THREE.Matrix4(), v3: new THREE.Vector3(), v4: new THREE.Vector3(),
         rest: 1           // the shape the jelly is pulling towards (the mouse wheel moves this)
       };
     }
@@ -641,7 +651,7 @@
       head.q.set(0, 0, 0, 1);
       head.s = 1.25;
       head.sv = 0;
-      head.wide = 1;
+      head.pk = 1; head.pkv = 0; head.shx = head.shz = head.shvx = head.shvz = 0; head.kd = 1;
       head.rest = 1;
       head.outer.visible = head.shadow.visible = true;
     }
@@ -654,10 +664,15 @@
           v.x = (head.hit.x - p.x) * 14;
           v.z = (tz - p.z) * 14;
           v.y = (REST + 0.45 - p.y) * 14;
-          head.sv += Math.hypot(v.x, v.z) * 0.012 * (Math.random() - 0.4); // it wobbles as it is dragged
+          head.sv += Math.hypot(v.x, v.z) * 0.02 * (Math.random() - 0.4); // it wobbles as it is dragged
         }
       } else if (pinch) {
-        v.set(0, (REST + 0.6 - p.y) * 10, 0);
+        // held between two fingers: it follows the point between them, lifted a little more
+        if (grabAt && aim(grabAt.x, grabAt.y).intersectPlane(head.plane, head.hit)) {
+          v.x = (head.hit.x - p.x) * 12;
+          v.z = (Math.max(FAR, head.hit.z) - p.z) * 12;
+        }
+        v.y = (REST + 0.7 - p.y) * 12;
       } else {
         v.y -= 30 * dt;
       }
@@ -665,9 +680,23 @@
 
       // jelly: a spring pulls it back to its shape, so it overshoots and wobbles
       if (performance.now() - wheelAt > 260) head.rest += (1 - head.rest) * Math.min(1, dt * 5); // a wheel stretch relaxes once the wheel stops
-      head.sv += (-(head.s - head.rest) * 190 - head.sv * 6.5) * dt;
+      head.sv += (-(head.s - head.rest) * 170 - head.sv * 5) * dt;
       head.s += head.sv * dt;
-      if (!pinch) head.wide += (1 - head.wide) * Math.min(1, dt * 9);
+      // it leans back against its own motion, and swings past upright when it stops
+      var leanX = Math.max(-0.7, Math.min(0.7, -v.x * 0.04)), leanZ = Math.max(-0.7, Math.min(0.7, -v.z * 0.04));
+      head.shvx += ((leanX - head.shx) * 130 - head.shvx * 4.5) * dt;
+      head.shvz += ((leanZ - head.shz) * 130 - head.shvz * 4.5) * dt;
+      head.shx += head.shvx * dt;
+      head.shz += head.shvz * dt;
+      // it stretches along the way it is going
+      var speed = v.length();
+      if (speed > 0.6) head.dir.lerp(head.v3.copy(v).multiplyScalar(1 / speed), Math.min(1, dt * 12)).normalize();
+      head.kd += (1 + Math.min(0.55, speed * 0.028) - head.kd) * Math.min(1, dt * 10);
+      // a two-finger stretch, once let go, snaps back and wobbles
+      if (!pinch) {
+        head.pkv += (-(head.pk - 1) * 170 - head.pkv * 5) * dt;
+        head.pk += head.pkv * dt;
+      }
 
       var floor = REST * Math.min(1, head.s);
       var onFloor = p.y <= floor;
@@ -692,16 +721,34 @@
         if (head.proj.y < -0.8 && v.z > 0) { v.z = -v.z * 0.7; head.sv += 3; }
       }
       var s = Math.max(0.1, head.s), side = 1 / Math.sqrt(s);
-      head.outer.position.copy(p);
-      head.outer.scale.set(side * head.wide, s / Math.sqrt(head.wide), side);
+      // The whole shape in one matrix, applied in this order: squash, stretch along the path,
+      // stretch between the fingers, lean, then move into place.
+      var M = head.mat.makeScale(side, s, side);
+      M.premultiply(alongLine(head.m2, head.dir, head.kd));
+      M.premultiply(alongLine(head.m2, head.pdir, Math.max(0.1, head.pk)));
+      M.premultiply(head.m2.set(1, head.shx, 0, 0, 0, 1, 0, 0, 0, head.shz, 1, 0, 0, 0, 0, 1));
+      M.setPosition(p.x, p.y, p.z);
+      head.outer.matrixAutoUpdate = false;
+      head.outer.matrix.copy(M);
+      head.outer.matrixWorldNeedsUpdate = true;
       head.group.quaternion.copy(head.q);
       var lift = p.y - REST;
       head.shadow.position.set(p.x, 0.01, p.z);
-      head.shadow.scale.set(side * head.wide / (1 + lift * 0.3), side / (1 + lift * 0.3), 1);
+      head.shadow.scale.set(side / (1 + lift * 0.3), side / (1 + lift * 0.3), 1);
       head.shadow.material.opacity = 0.5 / (1 + lift * 0.7);
       head.renderer.render(head.scene, head.camera);
       // pushed too far out of shape, it bursts
-      if (!bursting && (head.s > BURST_HI || head.s < BURST_LO || head.wide > BURST_HI)) burstHead();
+      if (!bursting && (head.s > BURST_HI || head.s < BURST_LO || head.pk > BURST_HI || head.pk < BURST_LO)) burstHead();
+    }
+    // A matrix that stretches by k along one line and thins the shape across it, keeping its volume.
+    function alongLine(out, d, k) {
+      var q = 1 / Math.sqrt(k), e = k - q;
+      return out.set(
+        q + e * d.x * d.x, e * d.x * d.y, e * d.x * d.z, 0,
+        e * d.y * d.x, q + e * d.y * d.y, e * d.y * d.z, 0,
+        e * d.z * d.x, e * d.z * d.y, q + e * d.z * d.z, 0,
+        0, 0, 0, 1
+      );
     }
     function local(e) {
       var r = canvas.getBoundingClientRect();
@@ -715,7 +762,9 @@
       var ids = Object.keys(touches);
       if (ids.length === 2 && (held || onSkull(pt))) { // a second finger: stretch it between the two
         var a = touches[ids[0]], b = touches[ids[1]];
-        pinch = { d0: Math.max(30, Math.hypot(a.x - b.x, a.y - b.y)), s0: head.s, w0: head.wide };
+        pinch = { d0: Math.max(70, Math.hypot(a.x - b.x, a.y - b.y)), // fingers that start close together do not over-stretch it at once
+          k0: head.pk, ang: Math.atan2(b.y - a.y, b.x - a.x) };
+        grabAt = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         held = true;
         return;
       }
@@ -734,10 +783,19 @@
         var ids = Object.keys(touches);
         if (ids.length < 2) return;
         var a = touches[ids[0]], b = touches[ids[1]];
-        var f = Math.hypot(a.x - b.x, a.y - b.y) / pinch.d0;
-        // fingers side by side pull it wide, fingers one above the other pull it tall
-        if (Math.abs(a.x - b.x) > Math.abs(a.y - b.y)) head.wide = pinch.w0 * f;
-        else { head.s = pinch.s0 * f; head.sv = 0; }
+        // it stretches along the line between the fingers, whatever angle that is
+        var e = head.camera.matrixWorld.elements, dx = b.x - a.x, dy = b.y - a.y, dl = Math.hypot(dx, dy) || 1;
+        head.pdir.set(e[0] * dx - e[4] * dy, e[1] * dx - e[5] * dy, e[2] * dx - e[6] * dy).multiplyScalar(1 / dl).normalize();
+        head.pk = pinch.k0 * (dl / pinch.d0);
+        head.pkv = 0;
+        // turning the fingers turns it; moving them together carries it
+        var ang = Math.atan2(dy, dx), turned = ang - pinch.ang;
+        if (turned > Math.PI) turned -= 2 * Math.PI;
+        if (turned < -Math.PI) turned += 2 * Math.PI;
+        pinch.ang = ang;
+        head.tmp.setFromAxisAngle(head.camera.getWorldDirection(head.v4), turned);
+        head.q.premultiply(head.tmp);
+        grabAt = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         return;
       }
       if (held) grabAt = pt;
@@ -830,7 +888,7 @@
       head.skull.visible = true;
       head.s = 1.5;
       head.sv = 0;
-      head.wide = 1;
+      head.pk = 1; head.pkv = 0; head.shx = head.shz = head.shvx = head.shvz = 0; head.kd = 1;
       head.rest = 1;
       head.vel.set((Math.random() - 0.5) * 6, 9, (Math.random() - 0.5) * 3);
       if (!reduceMotion) {
@@ -1086,8 +1144,7 @@
       view.classList.toggle("has-active", i >= 0);
       if (i < 0) return;
       var it = items[i];
-      scrollTo(i * lineH); // bring it to the middle
-      burst(nodes[i]);
+      scrollTo(i * lineH); // bring it to the anchor
       showT = setTimeout(function () { // the preview waits for the names to finish moving
         shot.style.backgroundColor = it.tone || "";
         shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
@@ -1102,7 +1159,6 @@
       n.textContent = it.domain;
       n.style.setProperty("--i", i);
       if (!it.url) n.tabIndex = 0;
-      glitch(n);
       n.addEventListener("click", function (e) { // the first click only picks it; the second opens it
         if (dragged) { e.preventDefault(); return; }
         if (active !== i) { e.preventDefault(); setActive(i); }
@@ -1136,9 +1192,15 @@
     }, { passive: false });
     var downY = null, lastY = 0;
     view.addEventListener("pointerdown", function (e) { downY = lastY = e.clientY; dragged = false; });
+    function endDrag() { downY = null; list.classList.remove("is-dragging"); }
+    view.addEventListener("pointercancel", endDrag);
     view.addEventListener("pointermove", function (e) {
       if (downY !== null && e.pointerType !== "mouse") { // drag up and down to slide the staircase
-        if (Math.abs(e.clientY - downY) > 8 && !dragged) { dragged = true; if (active >= 0) setActive(-1); }
+        if (Math.abs(e.clientY - downY) > 8 && !dragged) {
+          dragged = true;
+          list.classList.add("is-dragging"); // follow the finger directly, with no easing in between
+          if (active >= 0) setActive(-1);
+        }
         if (dragged) scrollTo(off - (e.clientY - lastY));
         lastY = e.clientY;
       }
@@ -1152,34 +1214,15 @@
       xy.textContent = "x " + ("000" + Math.round(x)).slice(-4) + "  y " + ("000" + Math.round(y)).slice(-4);
       xy.style.transform = "translate(" + (x + 12) + "px," + (y + 10) + "px)";
     });
-    window.addEventListener("pointerup", function () { downY = null; });
+    window.addEventListener("pointerup", endDrag);
     view.addEventListener("pointerleave", function () { view.classList.remove("has-cross"); });
     view.addEventListener("click", function (e) { if (!dragged && !e.target.closest(".play__item")) setActive(-1); });
   }
 
-  /* On a touch screen, a sideways swipe moves to the next or previous view, like sliding the switch. */
-  (function () {
-    var sx = null, sy = 0, st = 0;
-    window.addEventListener("touchstart", function (e) {
-      if (e.touches.length !== 1) { sx = null; return; }
-      sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now();
-    }, { passive: true });
-    window.addEventListener("touchend", function (e) {
-      if (sx === null) return;
-      var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-      sx = null;
-      if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - st > 700) return;
-      if (sheet.open || document.querySelector(".gallery.is-skull")) return; // not while a sheet is open or the head is out
-      var order = Array.prototype.map.call(document.querySelectorAll(".modes__btn"), function (b) { return b.dataset.mode; });
-      var next = order[order.indexOf(document.body.dataset.mode) + (dx < 0 ? 1 : -1)];
-      if (next) location.hash = next;
-    }, { passive: true });
-  })();
-
   buildIndex("all");
   wireIndex();
   buildPlay();
-  document.querySelectorAll(".modes__btn, .bar__out, .chip, .index__title, #view-index .index__foot a, .sheet__links a, .walk__intro h1").forEach(glitch);
+  document.querySelectorAll(".modes__btn, .index__title, .walk__intro h1").forEach(glitch); // titles and the switch only
   buildAbout();
   setMode();
   window.addEventListener("hashchange", setMode);

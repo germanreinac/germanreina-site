@@ -4,7 +4,7 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 ## The site (`index.html`)
 
-Three views, switched from the bar at the top (Gallery, Index, Play), or by swiping left and right on a phone:
+Three views, switched from the bar at the top (Gallery, Index, Play):
 
 - **Gallery** (`#gallery`): the home page. Your name and the line under it beside the looping Ra video from the current site, centred. The picture is dragged and torn along the path of the pointer or finger, with split colours, leaving a wake that takes a couple of seconds to settle. Titles and links across the site play the same glitch, briefly, when the pointer reaches them. This stands in for the interactive gallery until its art is made.
 - **Index** (`#index`): a plain list of projects with filters. Each row opens a sheet with the facts; images are on ArtStation for now.
@@ -13,7 +13,7 @@ Three views, switched from the bar at the top (Gallery, Index, Play), or by swip
 
 The home page has a Behead button (bottom left). The figure's head pops off as a jelly head and falls to a floor seen from above, on a slightly darker background with the name softened. Drag it anywhere on screen to roll it, let go to throw it, tap it to make it jump; it fades into fog as it goes back. Stretch it with two fingers (or the mouse wheel while pointing at it): pulled much too far, it bursts, the skull drops out, and after a glitch the whole figure returns. Head and skull are provisional ones built from simple shapes in `buildHead()` in `js/main.js`, to be replaced by the real models.
 
-There is no About page for now. Its content (bio, contact, links, experience, talks) is still in `js/projects.js` under `about`, and `js/main.js` still knows how to build it if an About view is added back to `index.html`.
+**About** (`#about`) is not in the bar: clicking the name on the home page opens it. It has the bio, contact, links, experience and talks from `js/projects.js`.
 
 Files: `index.html`, `css/style.css`, `js/main.js`, and the content in `js/projects.js`. The home video is `images/home/ra.mp4` with `images/home/ra-poster.jpg` as its still.
 

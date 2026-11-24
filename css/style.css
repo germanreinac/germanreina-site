@@ -33,6 +33,7 @@ body {
   font-size: 16px;
   line-height: 1.45;
 }
+html:has(body[data-dark]), body[data-dark] { background: var(--space); }
 [hidden] { display: none !important; }
 a { color: inherit; }
 button { font: inherit; color: inherit; }
@@ -144,7 +145,8 @@ body[data-dark] .bar :focus-visible { outline-color: var(--star); }
   80% { clip-path: inset(4% 0 82% 0); transform: translate(2px, 0); }
   100% { clip-path: inset(50% 0 50% 0); transform: none; }
 }
-.hero .walk__intro h1 { pointer-events: auto; }
+.hero .walk__intro h1 { pointer-events: auto; cursor: pointer; width: max-content; max-width: 100%; }
+.hero .walk__intro h1:focus-visible { outline-color: var(--star); }
 @media (prefers-reduced-motion: reduce) {
   .glitch.is-glitching, .glitch.is-glitching::before, .glitch.is-glitching::after { animation: none; content: none; }
 }
@@ -694,6 +696,7 @@ main { flex: 1; min-height: 0; position: relative; }
   background: var(--paper);
   color: var(--ink);
   cursor: crosshair;
+  touch-action: none; /* the page handles the drag itself, so the browser does not fight it */
 }
 .play__head {
   position: absolute;
@@ -712,7 +715,9 @@ main { flex: 1; min-height: 0; position: relative; }
   flex-direction: column;
   align-items: flex-start;
   transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
 }
+.play__list.is-dragging { transition: none; }
 .play__item {
   --push: 0;
   position: relative;
@@ -735,8 +740,8 @@ main { flex: 1; min-height: 0; position: relative; }
 }
 .play.has-active .play__item:not(.is-active) { opacity: 0.3; filter: blur(1.5px); }
 .play__item--soon { cursor: default; }
-/* no highlight on the chosen name: a soft halo of the page colour keeps it readable over the preview */
-.play__item.is-active { z-index: 4; text-shadow: 0 0 2px var(--paper), 0 0 14px var(--paper), 0 0 30px var(--paper), 0 0 44px var(--paper); }
+/* no highlight and no glow on the chosen name */
+.play__item.is-active { z-index: 4; }
 .play__item:focus-visible { outline-color: var(--ink); }
 .play__frame {
   position: absolute;
