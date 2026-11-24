@@ -8,7 +8,7 @@
   --ink-soft: #5c5762;
   --accent: #ff6b9a; /* the pink of the figure on the home page */
   --line: rgba(31, 26, 36, 0.16);
-  --space: #17151d;
+  --space: #272431;
   --star: #eceeea;
   --star-soft: #a9a8b0;
 
@@ -35,6 +35,7 @@ body {
 }
 html { background: var(--paper); }
 html:has(body[data-dark]), body[data-dark] { background: var(--space); }
+html:has(body.is-skull[data-dark]), body.is-skull[data-dark] { background: #211e2a; }
 [hidden] { display: none !important; }
 a { color: inherit; }
 button { font: inherit; color: inherit; }
@@ -638,7 +639,7 @@ main { flex: 1; min-height: 0; position: relative; }
   height: 100%;
   touch-action: none;
   /* pushes the clip's grey backdrop down towards the page's dark */
-  filter: contrast(1.35) brightness(0.72) saturate(1.1);
+  filter: contrast(1.1) brightness(0.92) saturate(1.05); /* gentle: the figure keeps its soft shadows */
 }
 /* the video only feeds the canvas */
 .hero__video { position: absolute; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
@@ -672,11 +673,13 @@ main { flex: 1; min-height: 0; position: relative; }
 .daybtn:hover { border-color: var(--accent); color: var(--accent); }
 .daybtn:focus-visible { outline-color: var(--star); }
 /* skull mode: a touch darker, the name out of focus so the skull has the stage */
-.gallery.is-space.is-skull { background: #131118; }
+.gallery.is-space { transition: background-color 0.8s ease; }
+.gallery.is-space.is-skull { background: #211e2a; }
 .gallery .walltext h1, .gallery .walltext p { transition: filter 0.5s ease, opacity 0.5s ease; }
 .gallery.is-skull .walltext h1, .gallery.is-skull .walltext p { filter: blur(2.2px); opacity: 0.6; }
 .gallery.is-skull .hero .walk__intro h1 { pointer-events: none; }
-.gallery.is-skull .hero__canvas { filter: none; cursor: grab; }
+.hero__canvas { transition: filter 0.8s ease; }
+.gallery.is-skull .hero__canvas { filter: contrast(1) brightness(1) saturate(1); cursor: grab; }
 .gallery.is-skull .hero.is-holding .hero__canvas { cursor: grabbing; }
 .gallery.is-skull .hero__stage { transform: none !important; }
 .gallery.is-switching .hero, .gallery.is-switching .gallery__foot { animation: flip-glitch 0.5s steps(1) both; }
@@ -901,6 +904,33 @@ main { flex: 1; min-height: 0; position: relative; }
   .walk__doors { margin-top: 1em; }
   .walk__door { padding: 6px 0 7px; }
 }
+
+/* ---------- index: a preview that follows the pointer along the rows ---------- */
+.peek {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  width: min(26vw, 22rem);
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: flex-end;
+  padding: 10px 12px;
+  border: 1px solid var(--ink);
+  background-color: var(--paper);
+  background-size: cover;
+  background-position: center;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(31, 26, 36, 0.6);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  will-change: transform;
+}
+.peek.is-on { opacity: 1; }
 
 /* ---------- project sheet ---------- */
 .sheet {

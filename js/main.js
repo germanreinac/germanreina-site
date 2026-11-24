@@ -225,6 +225,26 @@
       });
     });
     footer(document.getElementById("index-foot"), true);
+    // With a mouse, a framed preview of the project rides along with the pointer while it is on a row.
+    var peek = el("div", "peek");
+    peek.setAttribute("aria-hidden", "true");
+    document.body.appendChild(peek);
+    table.addEventListener("pointermove", function (e) {
+      var r = e.pointerType === "mouse" ? e.target.closest(".row") : null;
+      if (!r) { peek.classList.remove("is-on"); return; }
+      var p = bySlug[r.dataset.slug];
+      if (peek.dataset.slug !== p.slug) {
+        peek.dataset.slug = p.slug;
+        peek.style.backgroundColor = p.tone;
+        peek.style.backgroundImage = p.images[0] ? "url(" + p.images[0] + ")" : "none";
+        peek.textContent = p.images[0] ? "" : "Image pending";
+      }
+      peek.style.transform = "translate(" + (e.clientX - peek.offsetWidth / 2) + "px," + (e.clientY - peek.offsetHeight / 2) + "px)";
+      peek.classList.add("is-on");
+    });
+    table.addEventListener("pointerleave", function () { peek.classList.remove("is-on"); });
+    table.addEventListener("click", function () { peek.classList.remove("is-on"); });
+    window.addEventListener("hashchange", function () { peek.classList.remove("is-on"); });
     document.querySelectorAll(".view.index").forEach(function (v) { // the bottom blur lifts once you reach the end
       function atEnd() { v.classList.toggle("is-end", v.clientHeight > 0 && v.scrollTop + v.clientHeight >= v.scrollHeight - 90); }
       v.addEventListener("scroll", atEnd, { passive: true });
@@ -541,8 +561,10 @@
     // Rough handling builds up strain: shaking it from side to side, tapping it over and over, slamming it down.
     // Strain fades when it is left alone. It trembles as strain grows, and at 1 it bursts.
     var strain = 0, lastSx = 0, lastSz = 0;
+    var pop = null;      // the ring that marks where the head burst
+    var nightT = 9;      // seconds since the figure came back
     var THREE_SRC = "js/vendor/three.min.js";
-    var BG = 0x131118;           // the page colour in this mode; the skull fades into it with distance
+    var BG = 0x211e2a;           // the page colour in this mode; the skull fades into it with distance
     var FAR = -26;               // how far back it may go
     var REST = 0.95;             // height of its centre when it sits on the floor (its radius is about 1)
     var BURST_HI = 4.4, BURST_LO = 0.15; // stretched or squashed past these, it bursts
@@ -605,6 +627,14 @@
       skull.visible = false;
       var g = new THREE.Group();
       g.add(face, skull);
+      // the lumps of jelly the head breaks into
+      var bits = [], lump = new THREE.SphereGeometry(1, 14, 10);
+      for (var bi = 0; bi < 26; bi++) {
+        var bm = new THREE.Mesh(lump, bi % 6 === 0 ? green : (bi % 13 === 5 ? yellow : pink));
+        bm.visible = false;
+        scene.add(bm);
+        bits.push({ mesh: bm, vel: new THREE.Vector3(), r: 0.2, age: 9 });
+      }
       var outer = new THREE.Group(); // carries position and the jelly squash; the inner group carries the rolling
       outer.add(g);
       scene.add(outer);
@@ -614,11 +644,11 @@
       );
       shadow.rotation.x = -Math.PI / 2;
       scene.add(shadow);
-      var grid = new THREE.GridHelper(160, 64, 0x2c2935, 0x24212c); // a faint floor, so depth reads
+      var grid = new THREE.GridHelper(160, 64, 0x3a3647, 0x302c3b); // a faint floor, so depth reads
       grid.position.y = -0.01;
       scene.add(grid);
       return {
-        renderer: renderer, scene: scene, camera: camera, group: g, face: face, skull: skull, outer: outer, shadow: shadow,
+        renderer: renderer, scene: scene, camera: camera, group: g, face: face, skull: skull, outer: outer, shadow: shadow, bits: bits, rpx: 100,
         pos: new THREE.Vector3(0, REST, 0), vel: new THREE.Vector3(), w: new THREE.Vector3(),
         q: new THREE.Quaternion(), tmp: new THREE.Quaternion(), ax: new THREE.Vector3(),
         ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), hit: new THREE.Vector3(), proj: new THREE.Vector3(),
@@ -669,6 +699,7 @@
       head.vel.set((Math.random() - 0.5) * 3, 6.5, -1.2);
       head.face.visible = true;
       head.skull.visible = false;
+      head.bits.forEach(function (b) { b.mesh.visible = false; b.age = 9; });
       bursting = false;
       strain = 0;
       head.w.set(5, 0, (Math.random() - 0.5) * 7);
@@ -683,7 +714,10 @@
       var p = head.pos, v = head.vel;
       if (held && grabAt && !pinch) {
         // it follows the finger anywhere on the floor, lifted a little; its speed is the speed it is thrown with
-        if (aim(grabAt.x, grabAt.y).intersectPlane(head.plane, head.hit)) {
+        // the hand may go to the very edge of the screen, the head stops a little short of it
+        var box = bounds();
+        var gx2 = Math.max(box.l, Math.min(box.r, grabAt.x)), gy2 = Math.max(box.t, Math.min(box.b, grabAt.y));
+        if (aim(gx2, gy2).intersectPlane(head.plane, head.hit)) {
           var tz = Math.max(FAR, head.hit.z);
           v.x = (head.hit.x - p.x) * 14;
           v.z = (tz - p.z) * 14;
@@ -762,14 +796,23 @@
         head.tmp.setFromAxisAngle(head.ax.copy(head.w).normalize(), turn);
         head.q.premultiply(head.tmp);
       }
-      // free to roam the whole screen; it only bounces off the screen's own edges
+      // free to roam the whole screen, and never out of it: it bounces off the screen's own edges
       if (p.z < FAR) { p.z = FAR; v.z = Math.abs(v.z) * 0.6; }
       head.proj.copy(p).project(head.camera);
+      var px = (head.proj.x + 1) / 2 * W, py = (1 - head.proj.y) / 2 * H;
+      head.v3.setFromMatrixColumn(head.camera.matrixWorld, 0).multiplyScalar(1.3).add(p).project(head.camera);
+      head.rpx = Math.abs((head.v3.x + 1) / 2 * W - px); // how big it is on screen right now
       if (!held) {
-        if (head.proj.x < -0.88 && v.x < 0) { v.x = -v.x * 0.7; head.sv += 3; }
-        if (head.proj.x > 0.88 && v.x > 0) { v.x = -v.x * 0.7; head.sv += 3; }
-        if (head.proj.y < -0.8 && v.z > 0) { v.z = -v.z * 0.7; head.sv += 3; }
+        var bx = bounds();
+        if (px < bx.l && v.x < 0) { v.x = -v.x * 0.7; head.sv += 3; }
+        if (px > bx.r && v.x > 0) { v.x = -v.x * 0.7; head.sv += 3; }
+        if (py > bx.b && v.z > 0) { v.z = -v.z * 0.7; head.sv += 3; }
+        if (py < bx.t) { // the top of the screen is a ceiling in the air and a back wall on the floor
+          if (v.y > 0) v.y = -v.y * 0.3;
+          if (v.z < 0) v.z = -v.z * 0.7;
+        }
       }
+      stepBits(dt);
       var s = Math.max(0.1, head.s), side = 1 / Math.sqrt(s);
       // The whole shape in one matrix, applied in this order: squash, stretch along the path,
       // stretch between the fingers, lean, then move into place.
@@ -799,6 +842,31 @@
         e * d.z * d.x, e * d.z * d.y, q + e * d.z * d.z, 0,
         0, 0, 0, 1
       );
+    }
+    var EDGE = 0.037; // the canvas is a little larger than the screen, by this share on each side
+    function bounds() { // the part of the canvas the head's centre may be in, in canvas pixels
+      var r = head.rpx;
+      return { l: W * EDGE + r, r: W * (1 - EDGE) - r, t: H * EDGE + 56 + r, b: H * (1 - EDGE) - r * 0.7 };
+    }
+    function stepBits(dt) { // the lumps fly out, bounce, and shrink away
+      for (var i = 0; i < head.bits.length; i++) {
+        var b = head.bits[i];
+        if (!b.mesh.visible) continue;
+        b.age += dt;
+        b.vel.y -= 30 * dt;
+        b.mesh.position.addScaledVector(b.vel, dt);
+        if (b.mesh.position.y < b.r) {
+          b.mesh.position.y = b.r;
+          b.vel.y = Math.abs(b.vel.y) * 0.42;
+          b.vel.x *= 0.75;
+          b.vel.z *= 0.75;
+        }
+        var k = b.age < 1.3 ? 1 : Math.max(0, 1 - (b.age - 1.3) / 0.8);
+        // squashed a little by its own speed, like the head
+        var sq = 1 + Math.min(0.5, Math.abs(b.vel.y) * 0.03);
+        b.mesh.scale.set(b.r * k / Math.sqrt(sq), b.r * k * sq, b.r * k / Math.sqrt(sq));
+        if (k <= 0) b.mesh.visible = false;
+      }
     }
     function local(e) {
       var r = canvas.getBoundingClientRect();
@@ -884,7 +952,7 @@
       if (!head) return null;
       head.proj.copy(head.pos).project(head.camera);
       var cr = canvas.getBoundingClientRect();
-      return { x: Math.round((head.proj.x + 1) / 2 * W + cr.left), y: Math.round((1 - head.proj.y) / 2 * H + cr.top), fx: +head.pos.x.toFixed(2), fy: +head.pos.y.toFixed(2), fz: +head.pos.z.toFixed(2), s: +head.s.toFixed(2), strain: +strain.toFixed(2), on: day };
+      return { x: Math.round((head.proj.x + 1) / 2 * W + cr.left), y: Math.round((1 - head.proj.y) / 2 * H + cr.top), fx: +head.pos.x.toFixed(2), fy: +head.pos.y.toFixed(2), fz: +head.pos.z.toFixed(2), s: +head.s.toFixed(2), strain: +strain.toFixed(2), bursting: bursting, on: day };
     };
 
     var dayBtn = document.getElementById("daybtn");
@@ -905,6 +973,8 @@
       if (on === day) return;
       day = on;
       document.getElementById("view-gallery").classList.toggle("is-skull", day);
+      document.body.classList.toggle("is-skull", day);
+      burst(intro.querySelector("h1"));
       if (dayBtn) {
         dayBtn.setAttribute("aria-pressed", String(day));
         document.getElementById("daybtn-label").textContent = day ? "Put it back" : "Behead";
@@ -921,14 +991,23 @@
         dayT = 0;
         loadThree(function () {
           if (!head) { head = buildHead(); fitHead(); }
-          if (day) dropHead();
+          if (day) {
+            dropHead();
+            if (!reduceMotion) { // a few tears at the neck, nothing across the whole screen
+              var at = figureHead();
+              for (var i = 0; i < 7; i++) trail.push({ x: at.x + (Math.random() - 0.5) * at.r * 2, y: at.y + at.r * 0.9, vx: (Math.random() - 0.5) * 900, vy: 0, life: 0.45 });
+            }
+          }
         });
-      } else if (!reduceMotion) {
-        var pl = heroVideo.play();
-        if (pl && pl.catch) pl.catch(function () {});
+      } else {
+        nightT = 0; // the figure fades back in while the head or skull fades out
+        if (!reduceMotion) {
+          var pl = heroVideo.play();
+          if (pl && pl.catch) pl.catch(function () {});
+        }
       }
     }
-    function burstHead() { // the jelly pops, the skull drops out of it, and then the whole figure is back
+    function burstHead() { // the jelly pops into lumps, the skull is left behind, then the whole figure returns
       if (!day || bursting) return;
       bursting = true;
       held = false;
@@ -937,29 +1016,32 @@
       hero.classList.remove("is-holding");
       head.face.visible = false;
       head.skull.visible = true;
-      head.s = 1.5;
+      head.s = 1.35;
       head.sv = 0;
       head.pk = 1; head.pkv = 0; head.shx = head.shz = head.shvx = head.shvz = 0; head.kd = 1;
       head.rest = 1;
-      head.vel.set((Math.random() - 0.5) * 6, 9, (Math.random() - 0.5) * 3);
+      head.vel.set(head.vel.x * 0.15, 6.5, head.vel.z * 0.15); // the skull only hops, so the eye can stay on it
+      head.bits.forEach(function (b, i) {
+        var a = (i / head.bits.length) * 6.283 + Math.random() * 0.4, up = 3 + Math.random() * 8, out = 3 + Math.random() * 6;
+        b.r = 0.14 + Math.random() * 0.26;
+        b.age = 0;
+        b.mesh.position.copy(head.pos);
+        b.mesh.position.x += Math.cos(a) * 0.5;
+        b.mesh.position.z += Math.sin(a) * 0.5;
+        b.vel.set(Math.cos(a) * out, up, Math.sin(a) * out);
+        b.mesh.visible = true;
+      });
+      head.proj.copy(head.pos).project(head.camera);
+      pop = { x: (head.proj.x + 1) / 2 * W, y: (1 - head.proj.y) / 2 * H, t: 0, r: head.rpx };
       if (!reduceMotion) {
-        head.proj.copy(head.pos).project(head.camera);
-        var bx = (head.proj.x + 1) / 2 * W, by = (1 - head.proj.y) / 2 * H;
-        for (var i = 0; i < 46; i++) { // a ring of tears flying out from where it was
-          var a = (i / 46) * 6.283;
-          trail.push({ x: bx + Math.cos(a) * 70, y: by + Math.sin(a) * 70, vx: Math.cos(a) * 1500, vy: Math.sin(a) * 1500, life: 0.7 + Math.random() * 0.4 });
+        for (var i = 0; i < 9; i++) { // only a few short tears, so the picture stays readable
+          var ta = (i / 9) * 6.283;
+          trail.push({ x: pop.x + Math.cos(ta) * pop.r, y: pop.y + Math.sin(ta) * pop.r, vx: Math.cos(ta) * 700, vy: Math.sin(ta) * 250, life: 0.4 });
         }
       }
-      glitchScreen(30);
-      burstTimer = setTimeout(function () { // long enough to see the skull land
-        glitchScreen(50);
-        setSkull(false);
-      }, 1500);
+      burstTimer = setTimeout(function () { setSkull(false); }, 2600); // long enough to see the skull land and sit
     }
-    if (dayBtn) dayBtn.addEventListener("click", function () {
-      glitchScreen(34);
-      setSkull(!day);
-    });
+    if (dayBtn) dayBtn.addEventListener("click", function () { setSkull(!day); });
     window.addEventListener("resize", function () { size(); fitHead(); });
 
     function draw(now) {
@@ -982,10 +1064,11 @@
       bctx.clearRect(0, 0, W, H);
       if (day) {
         dayT += dt;
-        if (frame && dayT < 0.5) { // the body lingers for a moment after the head leaves it
+        if (frame && dayT < 0.8) { // the body fades away after the head leaves it
           var fw = frame.videoWidth || frame.naturalWidth, fh = frame.videoHeight || frame.naturalHeight;
           var ftall = W / H < 0.8, fs = Math.max(W / fw, H / fh) * (ftall ? 0.74 : 1), fy = H * (ftall ? 0.56 : 0.5);
-          bctx.globalAlpha = 0.85 * (1 - dayT / 0.5);
+          var fade = 1 - dayT / 0.8;
+          bctx.globalAlpha = fade * fade * (3 - 2 * fade);
           bctx.drawImage(frame, cx - (fw * fs) / 2, fy - (fh * fs) / 2, fw * fs, fh * fs);
           bctx.globalAlpha = 1;
           // soft-edged, so it dissolves instead of leaving a hard shape
@@ -1006,6 +1089,18 @@
           stepHead(dt);
           if (day) bctx.drawImage(head.renderer.domElement, 0, 0, W, H);
         }
+        if (pop) { // a ring opening out from where it burst
+          pop.t += dt;
+          var pk2 = pop.t / 0.45;
+          if (pk2 >= 1) pop = null;
+          else {
+            bctx.strokeStyle = "rgba(255,177,208," + (1 - pk2).toFixed(3) + ")";
+            bctx.lineWidth = 10 * (1 - pk2) + 1;
+            bctx.beginPath();
+            bctx.arc(pop.x, pop.y, pop.r * (0.8 + pk2 * 2.2), 0, 6.2832);
+            bctx.stroke();
+          }
+        }
       } else {
         sw = src.videoWidth || src.naturalWidth;
         sh = src.videoHeight || src.naturalHeight;
@@ -1013,7 +1108,11 @@
         // the figure sits in the middle of the screen; on a tall screen it is drawn smaller so it fits under the name
         scale = Math.max(W / sw, H / sh) * (tall ? 0.74 : 1);
         cy = H * (tall ? 0.56 : 0.5);
+        nightT += dt;
+        var back = Math.min(1, nightT / 0.8);
+        bctx.globalAlpha = back * back * (3 - 2 * back); // fades in when coming back from head mode
         bctx.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
+        bctx.globalAlpha = 1;
       }
       ctx.drawImage(buf, 0, 0, W, H);
 
@@ -1093,6 +1192,12 @@
       ctx.fillRect(-ry * 3, -ry * 3, ry * 6, ry * 6);
       ctx.restore();
       ctx.globalCompositeOperation = "source-over";
+      if (head && nightT < 0.6) { // what was left of head mode fades out over the returning figure
+        stepHead(dt);
+        ctx.globalAlpha = 1 - nightT / 0.6;
+        ctx.drawImage(head.renderer.domElement, 0, 0, W, H);
+        ctx.globalAlpha = 1;
+      }
     }
     requestAnimationFrame(draw);
 

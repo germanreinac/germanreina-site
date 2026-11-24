@@ -38,7 +38,7 @@ window.SITE = {
     { label: "LinkedIn", url: "https://www.linkedin.com/in/germ%C3%A1n-reina-carmona-a2627560/" },
     { label: "Art Discipline", url: "https://artdiscipline.com" },
     { label: "Photoshop Toolkit", url: "https://germanreinac.gumroad.com/l/photoshoptools" },
-    { label: "Mentorship", url: "https://www.trojan-unicorn.com/village/spaces/102-guidance-sessions/mentorships/offers/773-character-design" }
+    { label: "Mentorship", url: "https://germanreinac.gumroad.com/" }
   ],
 
   // The Play page: interactive sites and games. One line each.
@@ -101,7 +101,7 @@ window.PROJECTS = [
     title: "Megalith",
     kind: "own",
     year: "2027",
-    with: "Lizz Lunney",
+    with: "Own project",
     role: "Graphic novel, art",
     shape: "tall",
     tone: "#7fa7a0",
@@ -130,12 +130,12 @@ window.PROJECTS = [
     title: "Colorpoop",
     kind: "own",
     year: "",
-    with: "Opensandwich",
+    with: "Own project",
     role: "Short film, own IP",
     shape: "square",
     tone: "#b9a2e6",
     images: [],
-    notes: ["A personal world told through 2D animation, comic panels, 3D and physical products."],
+    notes: ["A personal world told through 2D animation, comic panels, 3D and physical products.", "Short film animated with Opensandwich."],
     link: { label: "colorpoop.com", url: "http://www.colorpoop.com" }
   },
   {
@@ -143,7 +143,7 @@ window.PROJECTS = [
     title: "Valorant",
     kind: "studio",
     year: "2019–21",
-    with: "Riot Games, via West Studio",
+    with: "Riot Games",
     role: "Concept artist",
     shape: "tall",
     tone: "#e8705f",
@@ -155,7 +155,7 @@ window.PROJECTS = [
     title: "Everdale",
     kind: "studio",
     year: "2019",
-    with: "Supercell, via Zombot Studio",
+    with: "Supercell",
     role: "Concept art",
     shape: "wide",
     tone: "#8fbf6a",
@@ -175,34 +175,8 @@ window.PROJECTS = [
     notes: ["Art Director."]
   },
   {
-    slug: "project-cubit",
-    title: "Project Cubit",
-    kind: "studio",
-    year: "2024",
-    with: "UMA Games",
-    role: "Art direction, concept art",
-    shape: "wide",
-    tone: "#74c2c9",
-    images: [],
-    notes: ["Art direction and concept art."],
-    link: { label: "UMA Games", url: "https://www.uma.games/playtest" }
-  },
-  {
-    slug: "tales-up",
-    title: "Tales Up",
-    kind: "studio",
-    year: "2024",
-    with: "Périple Studio",
-    role: "Art direction, concept art",
-    shape: "square",
-    tone: "#e6a6c8",
-    images: [],
-    notes: ["Art direction and concept art."],
-    link: { label: "Tales Up", url: "https://talesup.io/" }
-  },
-  {
-    slug: "rovio-new-ip",
-    title: "New IP",
+    slug: "rovio-new-game",
+    title: "New game",
     kind: "studio",
     year: "2022–23",
     with: "Rovio",
@@ -210,7 +184,19 @@ window.PROJECTS = [
     shape: "wide",
     tone: "#d86f5a",
     images: [],
-    notes: ["Environment concept art for a new IP."]
+    notes: ["Environment concept art for a new game."]
+  },
+  {
+    slug: "hourglass-moonland",
+    title: "Hourglass Moonland",
+    kind: "studio",
+    year: "",
+    with: "",
+    role: "TV show pitch",
+    shape: "tall",
+    tone: "#e3cf5a",
+    images: [],
+    notes: ["Visual development for a TV show pitch."]
   },
   {
     slug: "las-ninas-terribles",
@@ -223,30 +209,5 @@ window.PROJECTS = [
     tone: "#d99a6c",
     images: [],
     notes: ["A 10 minute animated short.", "Environment design and the whole background production."]
-  },
-  {
-    slug: "sunnyboy-pitch-bible",
-    title: "Pitch bible",
-    kind: "studio",
-    year: "",
-    with: "Sunnyboy Entertainment",
-    role: "Visual development",
-    shape: "tall",
-    tone: "#e3cf5a",
-    images: [],
-    notes: ["World building and visual development for an animation pitch bible."]
-  },
-  {
-    slug: "art-discipline",
-    title: "Art Discipline",
-    kind: "own",
-    year: "",
-    with: "",
-    role: "Newsletter, videos",
-    shape: "square",
-    tone: "#c9c4bb",
-    images: [],
-    notes: ["A monthly journal on processes and insights in art making."],
-    link: { label: "artdiscipline.com", url: "https://artdiscipline.com" }
   }
 ];
