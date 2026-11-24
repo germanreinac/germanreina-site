@@ -804,6 +804,43 @@ main { flex: 1; min-height: 0; position: relative; }
   75% { clip-path: inset(0 0 0 0); transform: translateX(2px); }
   100% { clip-path: inset(0 0 0 0); transform: none; }
 }
+.play__tag { display: none; }
+/* ---- the wheel ---- */
+.play.is-wheel .play__list { display: block; transition: none; transform: none; transform-style: preserve-3d; pointer-events: none; } /* names set back in depth would otherwise sit behind the list's own surface and miss the pointer */
+.play.is-wheel .play__item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  transform-origin: 0 50%;
+  transition: opacity 0.2s;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+.play.is-wheel.has-active .play__item:not(.is-active) { opacity: inherit; filter: inherit; }
+.play.is-wheel .play__frame {
+  z-index: 3;
+  left: 0;
+  top: 0;
+  transform: scale(0.06);
+  transition: transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.18s ease;
+}
+.play.is-wheel .play__frame.is-in { transform: scale(1); }
+.play.is-wheel .play__frame.is-in .play__shot { animation: none; }
+.play.is-wheel .play__tag { /* the chosen name, now sitting in the corner of its preview */
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0.12em 0.4em 0.16em 0.34em;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+  white-space: nowrap;
+}
 .play__cross, .play__xy { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; opacity: 0; }
 .play.has-cross .play__cross, .play.has-cross .play__xy { opacity: 1; }
 .play__cross--h { width: 100%; height: 1px; background: var(--line); }
@@ -932,8 +969,7 @@ main { flex: 1; min-height: 0; position: relative; }
   will-change: transform;
 }
 .peek.is-on { opacity: 0.7; }
-@media (pointer: coarse) { .peek { width: 88vw; transition: opacity 0.15s ease, transform 0.12s ease-out; } .peek.is-on { opacity: 0.55; } }
-.row.is-near .row__title { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+@media (pointer: coarse) { .peek { display: none; } } /* phones keep the plain list */
 .index__wrap { position: relative; z-index: 1; }
 #view-index .row:hover, #view-index .row:focus-visible { background: rgba(255, 107, 154, 0.5); } /* lets the preview show through the highlighted row */
 

@@ -244,33 +244,6 @@
       peek.classList.add("is-on");
     });
     table.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") peek.classList.remove("is-on"); });
-    if (window.matchMedia("(pointer: coarse)").matches) {
-      var nearRow = null;
-      function peekNearest() {
-        if (indexView.hidden) return;
-        var mid = indexView.getBoundingClientRect().top + indexView.clientHeight * 0.45, best = null, bd = 1e9;
-        table.querySelectorAll(".row").forEach(function (r) {
-          var b = r.getBoundingClientRect(), d = Math.abs((b.top + b.bottom) / 2 - mid);
-          if (d < bd) { bd = d; best = r; }
-        });
-        if (!best) return;
-        if (best !== nearRow) {
-          if (nearRow) nearRow.classList.remove("is-near");
-          nearRow = best;
-          nearRow.classList.add("is-near");
-          var p = bySlug[best.dataset.slug];
-          peek.style.backgroundColor = p.tone;
-          peek.style.backgroundImage = p.images[0] ? "url(" + p.images[0] + ")" : "none";
-          peek.textContent = p.images[0] ? "" : "Image pending";
-        }
-        var rb = best.getBoundingClientRect();
-        peek.style.transform = "translate(" + ((window.innerWidth - peek.offsetWidth) / 2) + "px," + ((rb.top + rb.bottom) / 2 - peek.offsetHeight / 2) + "px)";
-        peek.classList.add("is-on");
-      }
-      indexView.addEventListener("scroll", peekNearest, { passive: true });
-      window.addEventListener("hashchange", function () { setTimeout(peekNearest, 60); });
-      setTimeout(peekNearest, 120);
-    }
     table.addEventListener("click", function () { peek.classList.remove("is-on"); });
     window.addEventListener("hashchange", function () { peek.classList.remove("is-on"); });
     document.querySelectorAll(".view.index").forEach(function (v) { // the bottom blur lifts once you reach the end
@@ -349,7 +322,7 @@
     var name = location.hash.slice(1);
     var about = document.getElementById("view-about");
     var playView = document.getElementById("view-play");
-    var mode = name === "index" ? "index" : (name === "about" && about ? "about" : (name === "play" && playView ? "play" : "gallery"));
+    var mode = name === "index" ? "index" : (name === "about" && about ? "about" : ((name === "play" || name === "play-flat") && playView ? "play" : "gallery"));
     if (about) about.hidden = mode !== "about";
     if (playView) playView.hidden = mode !== "play";
     if (mode === "gallery" && homes.ready) showHome(HOMES.indexOf(name) > 0 ? name : "gallery");
@@ -1330,7 +1303,164 @@
      diagonal staircase that crosses the screen and carries on past its edges; scrolling slides the
      whole staircase along that diagonal. Clicking a name picks it: the others fly apart along the
      diagonal, and a moment later a preview opens behind it. Clicking it again opens the site. */
-  function buildPlay() {
+  /* Play as a wheel. The names sit on the rim of a big wheel seen almost edge-on: the ones in front run
+     down the same diagonal as before, then the rim bends away, and the far side shows behind, smaller,
+     soft and faint. Scrolling spins it, and it never ends. Picking a name parts its neighbours and the
+     name opens out into its preview, where it stays as a tag in the corner. */
+  function buildPlayWheel() {
+    var view = document.getElementById("view-play"), items = site.play;
+    if (!view || !items) return;
+    view.classList.add("is-wheel");
+    var list = document.getElementById("play-list"), frame = document.getElementById("play-frame");
+    var shot = document.getElementById("play-shot"), cap = document.getElementById("play-cap"), tag = document.getElementById("play-tag");
+    var SLOTS = Math.ceil(30 / items.length) * items.length;  // the list repeats until the rim is full
+    var STEP = (Math.PI * 2) / SLOTS, GAP = 0.2;              // GAP: how far neighbours part around a chosen name
+    var nodes = [], active = -1, opened = false, rot = 0, rotTo = 0, spinning = false;
+    var R = 300, lineH = 50, slope = 1, ax = 200, ay = 300, showT = 0, pickedAt = 0, lastPointer = "mouse", dragged = false;
+    var PREVIEW_DELAY = 300, hoverK = -1;
+    var hoverable = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+    function wrap(a) { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; }
+    function layout() {
+      for (var k = 0; k < SLOTS; k++) {
+        var n = nodes[k], th = wrap(k * STEP - rot);
+        if (active >= 0 && k !== active) { // neighbours lean away from the chosen name
+          var d = wrap((k - active) * STEP), near = Math.max(0, 1 - Math.abs(d) / 1.1);
+          th += (d > 0 ? 1 : -1) * GAP * near;
+        }
+        var depth = Math.cos(th), y = R * Math.sin(th);
+        var x = y * slope + (1 - depth) * R * 0.38; // the far side of the rim sits off to the right, so the wheel reads as a ring
+        var z = R * (depth - 1);
+        n.style.transform = "translate3d(" + (ax + x).toFixed(1) + "px," + (ay + y - lineH / 2).toFixed(1) + "px," + z.toFixed(1) + "px)" +
+          (depth > 0 ? " rotateX(" + (-th * 0.5).toFixed(3) + "rad)" : "");
+        var op = depth > 0 ? 0.16 + 0.84 * depth * depth : 0.07 + 0.09 * (1 + depth);
+        var blur = depth > 0 ? (1 - depth) * 3.5 : 3.5 + -depth * 2.5;
+        if (active >= 0 && k !== active) { op *= 0.4; blur += 1; }
+        if (k === active) { op = opened ? 0 : 1; blur = 0; } // once the preview is open, the name lives in its corner
+        n.style.opacity = op.toFixed(3);
+        var b = Math.round(blur * 2) / 2;
+        if (n._blur !== b) { n._blur = b; n.style.filter = b ? "blur(" + b + "px)" : "none"; }
+        n.style.zIndex = String(200 + Math.round(depth * 100));
+        n.style.pointerEvents = depth > 0.5 ? "auto" : "none";
+      }
+    }
+    function tick() {
+      rot += (rotTo - rot) * 0.2;
+      if (Math.abs(rotTo - rot) < 0.0004) { rot = rotTo; spinning = false; }
+      layout();
+      if (!spinning && hoverK >= 0 && active < 0) setActive(hoverK, false);
+      if (spinning) requestAnimationFrame(tick);
+    }
+    function spin(to) {
+      rotTo = to;
+      if (reduceMotion) { rot = rotTo; layout(); return; }
+      if (!spinning) { spinning = true; requestAnimationFrame(tick); }
+    }
+    function setActive(k, recentre) {
+      if (k === active) return;
+      active = k;
+      opened = false;
+      pickedAt = performance.now();
+      clearTimeout(showT);
+      frame.classList.remove("is-in");
+      view.classList.toggle("has-active", k >= 0);
+      if (k >= 0 && recentre) spin(rot + wrap(k * STEP - rot)); // a tap turns the wheel to bring it to the front
+      layout();
+      if (k < 0) return;
+      var it = items[k % items.length];
+      showT = setTimeout(function () {
+        shot.style.backgroundColor = it.tone || "";
+        shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
+        tag.textContent = it.domain;
+        tag.style.fontSize = list.style.fontSize;
+        cap.textContent = it.note + (it.url ? (hoverable ? " · click to open" : " · tap again to open") : " · not live yet");
+        // the preview opens out of the name: its corner sits where the name is, and it grows from there
+        var r = nodes[k].getBoundingClientRect(), vr = view.getBoundingClientRect();
+        var fw = frame.offsetWidth, fh = frame.offsetHeight;
+        var nx = r.left - vr.left, ny = r.top - vr.top;
+        var left = Math.max(12, Math.min(vr.width - fw - 12, nx - 14)), top = Math.max(60, Math.min(vr.height - fh - 12, ny - 10));
+        frame.style.left = left + "px";
+        frame.style.top = top + "px";
+        frame.style.transformOrigin = (nx - left + 20) + "px " + (ny - top + r.height / 2) + "px";
+        void frame.offsetWidth;
+        frame.classList.add("is-in");
+        opened = true;
+        layout();
+      }, reduceMotion ? 0 : (recentre ? PREVIEW_DELAY : 90));
+    }
+
+    for (var k = 0; k < SLOTS; k++) (function (k) {
+      var it = items[k % items.length];
+      var n = it.url ? outLink("", it.url, "play__item") : el("span", "play__item play__item--soon");
+      n.textContent = it.domain;
+      if (k < items.length && it.image) { var pre = new Image(); pre.src = it.image; }
+      if (k >= items.length) n.tabIndex = -1; else if (!it.url) n.tabIndex = 0;
+      n.addEventListener("pointerdown", function (e) { lastPointer = e.pointerType; });
+      // While the wheel is still turning nothing opens; whatever is under the pointer opens once it settles.
+      n.addEventListener("pointerenter", function (e) { if (e.pointerType !== "mouse") return; hoverK = k; if (!spinning) setActive(k, false); });
+      n.addEventListener("pointermove", function (e) { if (e.pointerType === "mouse" && !spinning && active !== k) { hoverK = k; setActive(k, false); } });
+      n.addEventListener("pointerleave", function (e) { if (e.pointerType !== "mouse") return; if (hoverK === k) hoverK = -1; if (active === k) setActive(-1); });
+      n.addEventListener("click", function (e) {
+        if (dragged) { e.preventDefault(); return; }
+        if (lastPointer === "mouse" && active === k) return;
+        if (active !== k) { e.preventDefault(); setActive(k, true); return; }
+        if (performance.now() - pickedAt < PREVIEW_DELAY + 250) e.preventDefault();
+      });
+      n.addEventListener("keydown", function (e) { if (e.key === "Enter" && active !== k) { e.preventDefault(); setActive(k, true); } });
+      list.appendChild(n);
+      nodes.push(n);
+    })(k);
+
+    function fit() {
+      if (view.hidden) return;
+      var w = list.clientWidth, h = list.clientHeight;
+      var size = Math.max(26, Math.min(w * (w < 600 ? 0.085 : 0.031), 44));
+      lineH = size * 1.22;
+      R = (lineH * 1.06 * SLOTS) / (Math.PI * 2);                       // one line of rim per name
+      slope = Math.max(size * 1.12, lineH * (w / h) * 0.72) / lineH;     // the same diagonal as the staircase
+      ax = Math.min(w * 0.3, R * slope * 0.7 + 16);
+      ay = h * 0.54;
+      list.style.fontSize = size + "px";
+      list.style.perspective = Math.round(R * 4.2) + "px";
+      list.style.perspectiveOrigin = ax + "px " + ay + "px";
+      layout();
+    }
+    footer(document.getElementById("play-foot"), false);
+    window.__playShown = fit;
+    window.addEventListener("resize", fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+
+    view.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      if (active >= 0) setActive(-1);
+      spin(rotTo + (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * 0.0016);
+    }, { passive: false });
+    var downY = null, lastY = 0;
+    view.addEventListener("pointerdown", function (e) { downY = lastY = e.clientY; dragged = false; });
+    function endDrag() { downY = null; }
+    view.addEventListener("pointercancel", endDrag);
+    window.addEventListener("pointerup", endDrag);
+    view.addEventListener("pointermove", function (e) {
+      if (downY !== null && e.pointerType !== "mouse") { // drag up and down to spin it
+        if (Math.abs(e.clientY - downY) > 8 && !dragged) { dragged = true; if (active >= 0) setActive(-1); }
+        if (dragged) { rot = rotTo = rot - (e.clientY - lastY) / R; layout(); }
+        lastY = e.clientY;
+      }
+      if (e.pointerType !== "mouse") return;
+      var r = view.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      view.classList.add("has-cross");
+      document.getElementById("cross-h").style.transform = "translateY(" + y + "px)";
+      document.getElementById("cross-v").style.transform = "translateX(" + x + "px)";
+      var xy = document.getElementById("cross-xy");
+      xy.textContent = "x " + ("000" + Math.round(x)).slice(-4) + "  y " + ("000" + Math.round(y)).slice(-4);
+      xy.style.transform = "translate(" + (x + 12) + "px," + (y + 10) + "px)";
+    });
+    view.addEventListener("pointerleave", function () { view.classList.remove("has-cross"); });
+    view.addEventListener("click", function (e) { if (!dragged && !e.target.closest(".play__item")) setActive(-1); });
+  }
+
+  /* Play as a flat staircase: the earlier version, kept at #play-flat for comparison. */
+  function buildPlayFlat() {
     var view = document.getElementById("view-play"), items = site.play;
     if (!view || !items) return;
     var list = document.getElementById("play-list"), frame = document.getElementById("play-frame");
@@ -1449,7 +1579,7 @@
 
   buildIndex("all");
   wireIndex();
-  buildPlay();
+  (location.hash === "#play-flat" ? buildPlayFlat : buildPlayWheel)();
   document.querySelectorAll(".modes__btn, .index__title, .walk__intro h1").forEach(glitch); // titles and the switch only
   buildAbout();
   setMode();
