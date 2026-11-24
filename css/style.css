@@ -932,6 +932,8 @@ main { flex: 1; min-height: 0; position: relative; }
   will-change: transform;
 }
 .peek.is-on { opacity: 0.7; }
+@media (pointer: coarse) { .peek { width: 88vw; transition: opacity 0.15s ease, transform 0.12s ease-out; } .peek.is-on { opacity: 0.55; } }
+.row.is-near .row__title { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .index__wrap { position: relative; z-index: 1; }
 #view-index .row:hover, #view-index .row:focus-visible { background: rgba(255, 107, 154, 0.5); } /* lets the preview show through the highlighted row */
 

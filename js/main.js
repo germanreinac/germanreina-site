@@ -243,7 +243,34 @@
       peek.style.transform = "translate(" + (e.clientX - peek.offsetWidth / 2) + "px," + (e.clientY - peek.offsetHeight / 2) + "px)";
       peek.classList.add("is-on");
     });
-    table.addEventListener("pointerleave", function () { peek.classList.remove("is-on"); });
+    table.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") peek.classList.remove("is-on"); });
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      var nearRow = null;
+      function peekNearest() {
+        if (indexView.hidden) return;
+        var mid = indexView.getBoundingClientRect().top + indexView.clientHeight * 0.45, best = null, bd = 1e9;
+        table.querySelectorAll(".row").forEach(function (r) {
+          var b = r.getBoundingClientRect(), d = Math.abs((b.top + b.bottom) / 2 - mid);
+          if (d < bd) { bd = d; best = r; }
+        });
+        if (!best) return;
+        if (best !== nearRow) {
+          if (nearRow) nearRow.classList.remove("is-near");
+          nearRow = best;
+          nearRow.classList.add("is-near");
+          var p = bySlug[best.dataset.slug];
+          peek.style.backgroundColor = p.tone;
+          peek.style.backgroundImage = p.images[0] ? "url(" + p.images[0] + ")" : "none";
+          peek.textContent = p.images[0] ? "" : "Image pending";
+        }
+        var rb = best.getBoundingClientRect();
+        peek.style.transform = "translate(" + ((window.innerWidth - peek.offsetWidth) / 2) + "px," + ((rb.top + rb.bottom) / 2 - peek.offsetHeight / 2) + "px)";
+        peek.classList.add("is-on");
+      }
+      indexView.addEventListener("scroll", peekNearest, { passive: true });
+      window.addEventListener("hashchange", function () { setTimeout(peekNearest, 60); });
+      setTimeout(peekNearest, 120);
+    }
     table.addEventListener("click", function () { peek.classList.remove("is-on"); });
     window.addEventListener("hashchange", function () { peek.classList.remove("is-on"); });
     document.querySelectorAll(".view.index").forEach(function (v) { // the bottom blur lifts once you reach the end
@@ -495,9 +522,7 @@
     var tint = document.createElement("canvas"), tctx = tint.getContext("2d");
 
     function size() {
-      // The clip is 720p, so on a wide screen one canvas pixel per CSS pixel already shows all of it;
-      // a retina-sized canvas would be four times the work for no extra detail. The 3D head gets a bit more.
-      dpr = Math.min(window.devicePixelRatio || 1, day || canvas.clientWidth < 700 ? 1.5 : 1);
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5); // sharp enough that the torn blocks have crisp edges, without the full retina cost
       dirty = true;
       W = canvas.clientWidth;
       H = canvas.clientHeight;
@@ -512,7 +537,7 @@
     var REACH = 64;      // how far from the path the picture is disturbed, in px
     var PULL = 0.06;     // how far it is dragged, per px/s of pointer speed
     var LINGER = 1.9;    // seconds the wake takes to settle
-    var STEP = 10, ROW = 5, CELL = 24, MAX_POINTS = 110;
+    var STEP = 10, ROW = 4, CELL = 16, MAX_POINTS = 110;
     var gx = new Float32Array(0), gy = new Float32Array(0), ga = new Float32Array(0);
     var trail = [], lastPt = null;
     var bufR = document.createElement("canvas"), rctx = bufR.getContext("2d");
@@ -1058,7 +1083,7 @@
         }
       }
       burstTimer = setTimeout(function () { // once the puddles have soaked away, the screen glitches back to the figure
-        glitchScreen(16);
+        glitchScreen(36);
         setSkull(false);
       }, 2500);
     }
@@ -1196,6 +1221,7 @@
             for (var c = c0; c <= c1; c++) {
               var id = r * cols + c, a = ga[id];
               if (a <= 0) continue;
+              if (a < 0.03) { gx[id] = gy[id] = ga[id] = 0; continue; } // too faint to see: not worth two draws
               var dx = Math.max(-90, Math.min(90, (gx[id] + (n1 - 0.5) * 22 * a) * tear));
               var dy = Math.max(-30, Math.min(30, gy[id]));
               var fringe = (2 + Math.abs(dx) * 0.22) * Math.min(1, a * 1.5);
