@@ -822,7 +822,7 @@ main { flex: 1; min-height: 0; position: relative; }
   z-index: 3;
   left: 0;
   top: 0;
-  width: min(40vw, 32rem, 70vh);
+  width: min(42vw, 38rem, 78vh);
   transform-origin: 0 0;
   transition: opacity 0.16s ease; /* its growth is driven frame by frame, on the same clock as the wheel */
 }

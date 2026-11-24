@@ -236,9 +236,11 @@
       var p = bySlug[r.dataset.slug];
       if (peek.dataset.slug !== p.slug) {
         peek.dataset.slug = p.slug;
+        // until a project has its own images, one of ten stand-in pictures (images/placeholder/) shows instead
+        var standIn = "images/placeholder/" + ("0" + (1 + Math.max(0, projects.indexOf(p)) % 10)).slice(-2) + ".jpg";
         peek.style.backgroundColor = p.tone;
-        peek.style.backgroundImage = p.images[0] ? "url(" + p.images[0] + ")" : "none";
-        peek.textContent = p.images[0] ? "" : "Image pending";
+        peek.style.backgroundImage = "url(" + (p.images[0] || standIn) + ")";
+        peek.textContent = p.images[0] ? "" : "Placeholder image";
       }
       peek.style.transform = "translate(" + (e.clientX - peek.offsetWidth / 2) + "px," + (e.clientY - peek.offsetHeight / 2) + "px)";
       peek.classList.add("is-on");
@@ -495,10 +497,12 @@
     var tint = document.createElement("canvas"), tctx = tint.getContext("2d");
 
     function size() {
-      dpr = Math.min(window.devicePixelRatio || 1, day ? 1.5 : 2); // the home picture at full detail; a little lighter while the 3D head is running
       dirty = true;
       W = canvas.clientWidth;
       H = canvas.clientHeight;
+      // Full detail on a phone; on a large window the picture is held to about 1.7 million pixels,
+      // which is what keeps the tearing smooth there.
+      dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, day ? 1.5 : 2, Math.sqrt(1.7e6 / Math.max(1, W * H))));
       canvas.width = buf.width = Math.round(W * dpr);
       canvas.height = buf.height = Math.round(H * dpr);
     }
@@ -545,13 +549,25 @@
     // The colour to put under see-through parts of the picture before tearing them: the page's own
     // background, adjusted so that it still matches once the canvas's CSS filter has been applied.
     var galleryEl = document.getElementById("view-gallery");
+    var underC = "", underAt = -1e9;
     function underColour() {
+      var nowU = performance.now();
+      if (underC && nowU - underAt < (dayT < 1.2 || nightT < 1.2 ? 0 : 1500)) return underC;
+      underAt = nowU;
       var bg = (getComputedStyle(galleryEl).backgroundColor.match(/[\d.]+/g) || [39, 36, 49]).map(Number);
       var f = getComputedStyle(canvas).filter || "";
       var kc = /contrast\(([\d.]+)\)/.exec(f), kb = /brightness\(([\d.]+)\)/.exec(f);
       var k = kc ? +kc[1] : 1, b = kb ? +kb[1] : 1;
       function inv(c) { return Math.max(0, Math.min(255, Math.round((((c / 255) / b - 0.5) / k + 0.5) * 255))); }
-      return "rgb(" + inv(bg[0]) + "," + inv(bg[1]) + "," + inv(bg[2]) + ")";
+      return (underC = "rgb(" + inv(bg[0]) + "," + inv(bg[1]) + "," + inv(bg[2]) + ")");
+    }
+    // The clip was rendered on a backdrop darker than the page. Anything in it darker than the page
+    // colour is raised to that colour, so the backdrop disappears into the page and nothing is pitch black.
+    function lift(c2d, x, y, w, h) {
+      c2d.globalCompositeOperation = "lighten";
+      c2d.fillStyle = underColour();
+      c2d.fillRect(x, y, w, h);
+      c2d.globalCompositeOperation = "source-over";
     }
     var hero = document.getElementById("hero");
     hero.addEventListener("pointermove", poke);
@@ -1169,7 +1185,7 @@
       // The clean frame goes straight to the screen unless it has to be torn first. Tearing needs a
       // solid picture, so anything see-through (the fading figure, the 3D head and its shadow) is
       // drawn on a layer of its own, then flattened onto the page colour for the torn cells to use.
-      var layered = torn && (day || nightT < 0.8);
+      var layered = torn && day;
       if (layered && (tint.width !== buf.width || tint.height !== buf.height)) { tint.width = buf.width; tint.height = buf.height; }
       var g0 = layered ? tctx : (torn ? bctx : ctx);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1178,7 +1194,7 @@
       if (!day && !src) return;
 
       // 1. the clean frame
-      var sw = 1, sh = 1, scale = 1, cx = W * 0.5, cy = H * 0.5;
+      var sw = 1, sh = 1, scale = 1, cx = W * 0.5, cy = H * 0.5, back = 1;
       if (torn) {
         bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         bctx.globalAlpha = 1;
@@ -1196,9 +1212,9 @@
           var fw = frame.videoWidth || frame.naturalWidth, fh = frame.videoHeight || frame.naturalHeight;
           var ftall = W / H < 0.8, fs = Math.max(W / fw, H / fh) * (ftall ? 0.74 : 1), fy = H * (ftall ? 0.56 : 0.5);
           var fade = 1 - dayT / 0.8;
-          g0.globalAlpha = fade * fade * (3 - 2 * fade);
+          fade = fade * fade * (3 - 2 * fade);
           g0.drawImage(frame, cx - (fw * fs) / 2, fy - (fh * fs) / 2, fw * fs, fh * fs);
-          g0.globalAlpha = 1;
+          lift(g0, cx - (fw * fs) / 2, fy - (fh * fs) / 2, fw * fs, fh * fs);
           // soft-edged, so it dissolves instead of leaving a hard shape
           var mrx = fh * fs * 0.3, mry = fh * fs * 0.46;
           g0.globalCompositeOperation = "destination-in";
@@ -1206,7 +1222,7 @@
           g0.translate(cx, fy);
           g0.scale(mrx / mry, 1);
           var mg = g0.createRadialGradient(0, 0, mry * 0.3, 0, 0, mry);
-          mg.addColorStop(0, "rgba(0,0,0,1)");
+          mg.addColorStop(0, "rgba(0,0,0," + fade.toFixed(3) + ")");
           mg.addColorStop(1, "rgba(0,0,0,0)");
           g0.fillStyle = mg;
           g0.fillRect(-mry * 4, -mry * 4, mry * 8, mry * 8);
@@ -1240,9 +1256,9 @@
         cy = H * (tall ? 0.56 : 0.5);
         nightT += dt;
         var back = Math.min(1, nightT / 0.8);
-        g0.globalAlpha = back * back * (3 - 2 * back); // fades in when coming back from head mode
+        back = back * back * (3 - 2 * back); // fades in when coming back from head mode (applied by the mask at the end)
         g0.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
-        g0.globalAlpha = 1;
+        lift(g0, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
       }
       if (layered) {
         bctx.fillStyle = underColour();
@@ -1324,7 +1340,7 @@
       ctx.translate(cx, cy);
       ctx.scale(rx / ry, 1);
       var g = ctx.createRadialGradient(0, 0, ry * 0.45, 0, 0, ry);
-      g.addColorStop(0, "rgba(0,0,0,1)");
+      g.addColorStop(0, "rgba(0,0,0," + back.toFixed(3) + ")");
       g.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = g;
       ctx.fillRect(-ry * 3, -ry * 3, ry * 6, ry * 6);
@@ -1590,11 +1606,14 @@
     function fit() {
       if (view.hidden) return;
       var w = list.clientWidth, h = list.clientHeight;
-      var size = Math.max(26, Math.min(w * (w < 600 ? 0.085 : 0.031), 44));
+      // on a phone it is sized by the width; on a wide screen by the height, so the front of the wheel fills it
+      var wide = w >= 600;
+      var size = wide ? Math.max(30, Math.min(w * 0.05, h / 13.5, 84)) : Math.max(26, Math.min(w * 0.085, 44));
       lineH = size * 1.22;
       R = (lineH * 1.06 * SLOTS) / (Math.PI * 2);                       // one line of rim per name
       slope = Math.max(size * 1.12, lineH * (w / h) * 0.72) / lineH;     // the same diagonal as the staircase
-      ax = Math.min(w * 0.3, R * slope * 0.7 + 16);
+      // wide: the name at the front sits across the middle of the view, where its thumbnail will open
+      ax = wide ? Math.max(R * slope * 0.55 + 16, w * 0.5 - size * 4.3) : Math.min(w * 0.3, R * slope * 0.7 + 16);
       ay = h * 0.54;
       list.style.fontSize = size + "px";
       list.style.perspective = Math.round(R * 4.2) + "px";

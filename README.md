@@ -21,7 +21,7 @@ Files: `index.html`, `css/style.css`, `js/main.js`, and the content in `js/proje
 
 Everything is in `js/projects.js`: the line under the name, the home doors, links, the about text, experience, talks, and one block per project.
 
-To add images to a project, put them in `images/<project-slug>/` and list the paths in that project's `images` array. The first one hangs in the gallery; all of them show in the project sheet, and the ArtStation link for that project goes away.
+Until a project has images of its own, the Index hover preview shows one of ten stand-in pictures from `images/placeholder/` (existing pictures of yours, in no particular order). To add images to a project, put them in `images/<project-slug>/` and list the paths in that project's `images` array. The first one hangs in the gallery; all of them show in the project sheet, and the ArtStation link for that project goes away.
 
 ## The lab (`lab.html`)
 
