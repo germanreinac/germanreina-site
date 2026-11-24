@@ -28,6 +28,9 @@ window.SITE = {
     { title: "Improve your art", sub: "Mentorship and free brushes", url: "https://germanreinac.gumroad.com/" }
   ],
 
+  // Which of the links below show at the foot of the Index.
+  footLinks: ["Instagram", "ArtStation", "Mentorship"],
+
   links: [
     { label: "Instagram", url: "https://www.instagram.com/germanreinac/" },
     { label: "ArtStation", url: "https://www.artstation.com/germanreina" },

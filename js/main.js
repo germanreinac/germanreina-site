@@ -67,6 +67,18 @@
     node._glitchT = setTimeout(function () { node.classList.remove("is-glitching"); }, 420);
   }
 
+  // The same closing line on Index and Play: a few links (where asked for) and the credit.
+  function footer(parent, withLinks) {
+    if (!parent) return;
+    if (withLinks) {
+      var keep = site.footLinks || [];
+      site.links.forEach(function (l) {
+        if (keep.indexOf(l.label) >= 0) parent.appendChild(outLink(l.label + " ↗", l.url));
+      });
+    }
+    parent.appendChild(el("span", "credit", site.name + " © " + new Date().getFullYear()));
+  }
+
   function linkList(parent) {
     site.links.forEach(function (l) {
       var a = el("a", null, l.label + " ↗");
@@ -212,7 +224,14 @@
         buildIndex(c.dataset.filter);
       });
     });
-    linkList(document.getElementById("index-foot"));
+    footer(document.getElementById("index-foot"), true);
+    document.querySelectorAll(".view.index").forEach(function (v) { // the bottom blur lifts once you reach the end
+      function atEnd() { v.classList.toggle("is-end", v.scrollTop + v.clientHeight >= v.scrollHeight - 90); }
+      v.addEventListener("scroll", atEnd, { passive: true });
+      window.addEventListener("resize", atEnd);
+      window.addEventListener("hashchange", function () { setTimeout(atEnd, 0); });
+      atEnd();
+    });
   }
 
   /* ---------- project sheet ---------- */
@@ -518,6 +537,9 @@
     /* ---- skull mode: the figure's head pops off as a jelly skull to roll, bounce, stretch and burst ---- */
     var day = false, dayT = 9, head = null, held = false, grabAt = null, downAt = null;
     var touches = {}, pinch = null, wheelAt = 0, bursting = false, burstTimer = 0;
+    // Rough handling builds up strain: shaking it from side to side, tapping it over and over, slamming it down.
+    // Strain fades when it is left alone. It trembles as strain grows, and at 1 it bursts.
+    var strain = 0, lastSx = 0, lastSz = 0;
     var THREE_SRC = "js/vendor/three.min.js";
     var BG = 0x131118;           // the page colour in this mode; the skull fades into it with distance
     var FAR = -26;               // how far back it may go
@@ -647,6 +669,7 @@
       head.face.visible = true;
       head.skull.visible = false;
       bursting = false;
+      strain = 0;
       head.w.set(5, 0, (Math.random() - 0.5) * 7);
       head.q.set(0, 0, 0, 1);
       head.s = 1.25;
@@ -665,6 +688,12 @@
           v.z = (tz - p.z) * 14;
           v.y = (REST + 0.45 - p.y) * 14;
           head.sv += Math.hypot(v.x, v.z) * 0.02 * (Math.random() - 0.4); // it wobbles as it is dragged
+          // shaken hard one way and then the other: each fast change of direction strains it
+          var sxn = Math.abs(v.x) > 9 ? (v.x > 0 ? 1 : -1) : 0, szn = Math.abs(v.z) > 9 ? (v.z > 0 ? 1 : -1) : 0;
+          if (sxn && lastSx && sxn !== lastSx) strain += 0.14;
+          if (szn && lastSz && szn !== lastSz) strain += 0.14;
+          if (sxn) lastSx = sxn;
+          if (szn) lastSz = szn;
         }
       } else if (pinch) {
         // held between two fingers: it follows the point between them, lifted a little more
@@ -678,6 +707,22 @@
       }
       p.addScaledVector(v, dt);
 
+      // strain: fades when left alone, makes it tremble as it grows
+      if (!bursting) {
+        strain = Math.max(0, strain - dt * (held ? 0.06 : 0.11));
+        if (strain > 0.3 && !reduceMotion) {
+          var shake = (strain - 0.3) * 1.6;
+          head.sv += (Math.random() - 0.5) * shake * 26;
+          head.shvx += (Math.random() - 0.5) * shake * 16;
+          head.shvz += (Math.random() - 0.5) * shake * 16;
+          if (strain > 0.65 && Math.random() < 0.3) { // close to breaking: the picture starts to tear around it
+            head.proj.copy(p).project(head.camera);
+            var gxp = (head.proj.x + 1) / 2 * W, gyp = (1 - head.proj.y) / 2 * H, ga2 = Math.random() * 6.283;
+            trail.push({ x: gxp + Math.cos(ga2) * 90, y: gyp + Math.sin(ga2) * 90, vx: Math.cos(ga2) * 700, vy: Math.sin(ga2) * 200, life: 0.4 });
+          }
+        }
+        if (strain >= 1) burstHead();
+      }
       // jelly: a spring pulls it back to its shape, so it overshoots and wobbles
       if (performance.now() - wheelAt > 260) head.rest += (1 - head.rest) * Math.min(1, dt * 5); // a wheel stretch relaxes once the wheel stops
       head.sv += (-(head.s - head.rest) * 170 - head.sv * 5) * dt;
@@ -701,7 +746,11 @@
       var floor = REST * Math.min(1, head.s);
       var onFloor = p.y <= floor;
       if (onFloor) {
-        if (v.y < -3) { head.sv -= -v.y * 0.5; v.y = -v.y * 0.52; } // lands, squashes, bounces
+        if (v.y < -3) { // lands, squashes, bounces; a hard landing strains it
+          if (v.y < -9) strain += Math.min(0.14, (-v.y - 9) * 0.02);
+          head.sv -= -v.y * 0.5;
+          v.y = -v.y * 0.52;
+        }
         else if (v.y < 0) v.y = 0;
         p.y = floor;
         if (!held) { var f = Math.pow(0.32, dt); v.x *= f; v.z *= f; }
@@ -817,7 +866,7 @@
       var quick = downAt && performance.now() - downAt.t < 260 && Math.hypot(grabAt.x - downAt.x, grabAt.y - downAt.y) < 8;
       // a tap makes it jump; a throw carries a hop with it
       head.vel.y = quick ? 10 : Math.min(15, Math.hypot(head.vel.x, head.vel.z) * 0.3);
-      if (quick) head.sv += 5;
+      if (quick) { head.sv += 5; strain += 0.2; } // tapped again and again, it gives way
     }
     hero.addEventListener("pointerup", letGo);
     hero.addEventListener("pointercancel", letGo);
@@ -834,7 +883,7 @@
       if (!head) return null;
       head.proj.copy(head.pos).project(head.camera);
       var cr = canvas.getBoundingClientRect();
-      return { x: Math.round((head.proj.x + 1) / 2 * W + cr.left), y: Math.round((1 - head.proj.y) / 2 * H + cr.top), fx: +head.pos.x.toFixed(2), fy: +head.pos.y.toFixed(2), fz: +head.pos.z.toFixed(2), s: +head.s.toFixed(2), on: day };
+      return { x: Math.round((head.proj.x + 1) / 2 * W + cr.left), y: Math.round((1 - head.proj.y) / 2 * H + cr.top), fx: +head.pos.x.toFixed(2), fy: +head.pos.y.toFixed(2), fz: +head.pos.z.toFixed(2), s: +head.s.toFixed(2), strain: +strain.toFixed(2), on: day };
     };
 
     var dayBtn = document.getElementById("daybtn");
@@ -865,6 +914,7 @@
       touches = {};
       clearTimeout(burstTimer);
       bursting = false;
+      strain = 0;
       if (day) {
         heroVideo.pause();
         dayT = 0;
@@ -1121,6 +1171,8 @@
     var shot = document.getElementById("play-shot"), cap = document.getElementById("play-cap");
     var nodes = [], active = -1, off = -1, lineH = 60, step = 100, showT = 0;
     var PREVIEW_DELAY = 550; // ms between the names flying apart and the preview opening
+    var pickedAt = 0, lastPointer = "mouse";
+    var hoverable = window.matchMedia("(hover: hover) and (pointer: fine)").matches; // a mouse: point to preview, click to open
 
     function place() { // slide the staircase so the name at "off" sits at the left, a little above the middle
       var h = list.clientHeight, w = list.clientWidth;
@@ -1131,9 +1183,10 @@
       off = Math.max(0, Math.min((nodes.length - 1) * lineH, v));
       place();
     }
-    function setActive(i) {
+    function setActive(i, recentre) {
       if (i === active) return;
       active = i;
+      pickedAt = performance.now();
       clearTimeout(showT);
       frame.classList.remove("is-in");
       nodes.forEach(function (n, k) {
@@ -1144,11 +1197,11 @@
       view.classList.toggle("has-active", i >= 0);
       if (i < 0) return;
       var it = items[i];
-      scrollTo(i * lineH); // bring it to the anchor
+      if (recentre) scrollTo(i * lineH); // a tap brings it to the anchor; under a mouse it stays where the pointer is
       showT = setTimeout(function () { // the preview waits for the names to finish moving
         shot.style.backgroundColor = it.tone || "";
         shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
-        cap.textContent = it.note + (it.url ? " · click again to open" : " · not live yet");
+        cap.textContent = it.note + (it.url ? (hoverable ? " · click to open" : " · tap again to open") : " · not live yet");
         void frame.offsetWidth;
         frame.classList.add("is-in");
       }, reduceMotion ? 0 : PREVIEW_DELAY);
@@ -1159,11 +1212,19 @@
       n.textContent = it.domain;
       n.style.setProperty("--i", i);
       if (!it.url) n.tabIndex = 0;
-      n.addEventListener("click", function (e) { // the first click only picks it; the second opens it
+      n.addEventListener("pointerdown", function (e) { lastPointer = e.pointerType; });
+      // With a mouse, pointing at a name previews it and a click opens it.
+      n.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse") setActive(i, false); });
+      n.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse" && active === i) setActive(-1); });
+      // With a finger, the first tap previews it and a second tap opens it. A tap that lands before the
+      // preview has had time to show never opens anything, so one tap can not count twice.
+      n.addEventListener("click", function (e) {
         if (dragged) { e.preventDefault(); return; }
-        if (active !== i) { e.preventDefault(); setActive(i); }
+        if (lastPointer === "mouse" && active === i) return; // already previewed by pointing at it: open
+        if (active !== i) { e.preventDefault(); setActive(i, true); return; }
+        if (performance.now() - pickedAt < PREVIEW_DELAY + 250) e.preventDefault();
       });
-      n.addEventListener("keydown", function (e) { if (e.key === "Enter" && active !== i) { e.preventDefault(); setActive(i); } });
+      n.addEventListener("keydown", function (e) { if (e.key === "Enter" && active !== i) { e.preventDefault(); setActive(i, true); } });
       list.appendChild(n);
       nodes.push(n);
     });
@@ -1171,23 +1232,23 @@
     function fit() {
       if (view.hidden) return;
       var w = list.clientWidth, h = list.clientHeight;
-      var size = Math.max(26, Math.min(w * (w < 600 ? 0.085 : 0.066), 96));
+      var size = Math.max(26, Math.min(w * (w < 600 ? 0.085 : 0.044), 62));
       lineH = size * 1.22;
       // the staircase runs roughly from the top-left corner towards the bottom-right one
-      step = Math.max(size * 0.9, lineH * (w / h) * 0.72);
+      step = Math.max(size * 1.12, lineH * (w / h) * 0.72); // never steeper than about 47 degrees
       list.style.fontSize = size + "px";
       list.style.setProperty("--step", step + "px");
       list.style.setProperty("--line", lineH + "px");
       if (off < 0) off = 0;
       scrollTo(active >= 0 ? active * lineH : off);
     }
+    footer(document.getElementById("play-foot"), false);
     window.__playShown = fit;
     window.addEventListener("resize", fit);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 
     view.addEventListener("wheel", function (e) {
       e.preventDefault();
-      if (active >= 0) setActive(-1);
       scrollTo(off + (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * 0.6);
     }, { passive: false });
     var downY = null, lastY = 0;

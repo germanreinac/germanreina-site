@@ -27,12 +27,13 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--fog);
+  background: var(--paper); /* the light pages run to the very bottom of the screen in one colour */
   color: var(--ink);
   font-family: var(--display);
   font-size: 16px;
   line-height: 1.45;
 }
+html { background: var(--paper); }
 html:has(body[data-dark]), body[data-dark] { background: var(--space); }
 [hidden] { display: none !important; }
 a { color: inherit; }
@@ -533,8 +534,10 @@ main { flex: 1; min-height: 0; position: relative; }
   background: linear-gradient(rgba(245, 245, 241, 0), var(--paper));
   -webkit-mask-image: linear-gradient(transparent, #000 75%);
   mask-image: linear-gradient(transparent, #000 75%);
+  transition: opacity 0.2s;
 }
 
+.index.is-end::after { opacity: 0; } /* at the very bottom there is nothing left to blur, so the page ends clean */
 .index__wrap {
   max-width: 68rem;
   margin: 0 auto;
@@ -604,6 +607,8 @@ main { flex: 1; min-height: 0; position: relative; }
   .row__go { display: none; }
 }
 .index__foot {
+  position: relative;
+  z-index: 4; /* above the blur at the bottom edge, so the links stay sharp */
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
@@ -611,6 +616,7 @@ main { flex: 1; min-height: 0; position: relative; }
   font-family: var(--mono);
   font-size: 0.8rem;
 }
+.index__foot .credit, .play__foot .credit { margin-left: auto; color: var(--ink-soft); }
 
 /* ---------- home: the Ra video behind the name ---------- */
 .hero {
@@ -700,12 +706,36 @@ main { flex: 1; min-height: 0; position: relative; }
 }
 .play__head {
   position: absolute;
-  z-index: 2;
+  z-index: 4;
   left: max(16px, 6vw, env(safe-area-inset-left, 0px));
   top: clamp(24px, 5vw, 56px);
   transition: opacity 0.3s ease, filter 0.3s ease;
 }
-.play.has-active .play__head { opacity: 0.25; filter: blur(3px); }
+/* the top of the page keeps its heading readable: names sliding up under it fade and blur out */
+.play::before {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: clamp(190px, 34vh, 290px);
+  pointer-events: none;
+  background: linear-gradient(var(--paper) 45%, rgba(245, 245, 241, 0));
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  -webkit-mask-image: linear-gradient(#000 55%, transparent);
+  mask-image: linear-gradient(#000 55%, transparent);
+}
+.play__foot {
+  position: absolute;
+  z-index: 4;
+  right: max(16px, 6vw, env(safe-area-inset-right, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
 .play__note { margin: 10px 0 0; font-family: var(--mono); font-size: 0.8rem; color: var(--ink-soft); }
 .play__list {
   position: absolute;
