@@ -730,6 +730,7 @@ main { flex: 1; min-height: 0; position: relative; }
   left: var(--edge);
   right: var(--edge-r);
   top: clamp(24px, 5vw, 56px);
+  pointer-events: none; /* the heading never gets between the pointer and the wheel */
   transition: opacity 0.3s ease, filter 0.3s ease;
 }
 /* the top of the page keeps its heading readable: names sliding up under it fade and blur out */
@@ -740,13 +741,13 @@ main { flex: 1; min-height: 0; position: relative; }
   left: 0;
   right: 0;
   top: 0;
-  height: clamp(165px, 27vh, 230px);
+  height: clamp(140px, 24vh, 205px); /* solid behind the heading and its note, then a short fade: no half-hidden names beside the title */
   pointer-events: none;
-  background: linear-gradient(var(--paper) 45%, rgba(245, 245, 241, 0));
+  background: linear-gradient(var(--paper) 80%, rgba(245, 245, 241, 0));
   -webkit-backdrop-filter: blur(7px);
   backdrop-filter: blur(7px);
-  -webkit-mask-image: linear-gradient(#000 55%, transparent);
-  mask-image: linear-gradient(#000 55%, transparent);
+  -webkit-mask-image: linear-gradient(#000 84%, transparent);
+  mask-image: linear-gradient(#000 84%, transparent);
 }
 .play__foot {
   position: absolute;
@@ -845,7 +846,7 @@ main { flex: 1; min-height: 0; position: relative; }
   z-index: 3;
   left: 0;
   top: 0;
-  width: min(42vw, 38rem, 78vh);
+  width: min(40vw, 34rem, 62vh);
   transform-origin: 0 0;
   transition: opacity 0.16s ease; /* its growth is driven frame by frame, on the same clock as the wheel */
 }
