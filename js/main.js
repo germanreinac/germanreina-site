@@ -226,11 +226,12 @@
     });
     footer(document.getElementById("index-foot"), true);
     document.querySelectorAll(".view.index").forEach(function (v) { // the bottom blur lifts once you reach the end
-      function atEnd() { v.classList.toggle("is-end", v.scrollTop + v.clientHeight >= v.scrollHeight - 90); }
+      function atEnd() { v.classList.toggle("is-end", v.clientHeight > 0 && v.scrollTop + v.clientHeight >= v.scrollHeight - 90); }
       v.addEventListener("scroll", atEnd, { passive: true });
       window.addEventListener("resize", atEnd);
       window.addEventListener("hashchange", function () { setTimeout(atEnd, 0); });
       atEnd();
+      setTimeout(atEnd, 80); // again once the page has laid out, in case it opened on this view
     });
   }
 
