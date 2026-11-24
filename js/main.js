@@ -495,7 +495,7 @@
     var tint = document.createElement("canvas"), tctx = tint.getContext("2d");
 
     function size() {
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5); // sharp enough that the torn blocks have crisp edges, without the full retina cost
+      dpr = Math.min(window.devicePixelRatio || 1, day ? 1.5 : 2); // the home picture at full detail; a little lighter while the 3D head is running
       dirty = true;
       W = canvas.clientWidth;
       H = canvas.clientHeight;
@@ -520,7 +520,7 @@
       if (day && (held || bursting)) return; // no tearing while the head is in your hand, so you can see it
       var r = canvas.getBoundingClientRect();
       var x = e.clientX - r.left, y = e.clientY - r.top, t = performance.now();
-      if (!lastPt || t - lastPt.t > 250) { lastPt = { x: x, y: y, t: t }; trail.push({ x: x, y: y, vx: 0, vy: 0, life: day ? 0.45 : 1 }); return; }
+      if (!lastPt || t - lastPt.t > 250) { lastPt = { x: x, y: y, t: t }; trail.push({ x: x, y: y, vx: 0, vy: 0, life: day ? 0.7 : 1 }); return; }
       var dx = x - lastPt.x, dy = y - lastPt.y, d = Math.hypot(dx, dy);
       if (d < STEP) return;
       var dtp = Math.max(8, t - lastPt.t) / 1000;
@@ -528,10 +528,30 @@
       // fill the gap since the last event, so a fast flick still leaves an unbroken wake
       var n = Math.min(12, Math.floor(d / STEP));
       for (var k = 1; k <= n; k++) {
-        trail.push({ x: lastPt.x + (dx * k) / n, y: lastPt.y + (dy * k) / n, vx: vx, vy: vy, life: day ? 0.45 : 1 }); // a shorter, fainter wake in head mode
+        trail.push({ x: lastPt.x + (dx * k) / n, y: lastPt.y + (dy * k) / n, vx: vx, vy: vy, life: day ? 0.7 : 1 }); // a slightly shorter wake in head mode
       }
       if (trail.length > MAX_POINTS) trail.splice(0, trail.length - MAX_POINTS);
       lastPt = { x: x, y: y, t: t };
+    }
+    // A short burst of tears around a point: n of them, on a ring of radius rad, flying outwards.
+    function spark(x, y, n, rad, power, life, flat) {
+      if (reduceMotion) return;
+      for (var i = 0; i < n; i++) {
+        var a = flat ? (i % 2 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.5 : Math.random() * 6.283, d = rad * (0.5 + Math.random() * 0.7);
+        trail.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * (flat ? 0.3 : 1), vx: Math.cos(a) * power, vy: Math.sin(a) * power * 0.3, life: life * (0.7 + Math.random() * 0.3) });
+      }
+      if (trail.length > 170) trail.splice(0, trail.length - 170);
+    }
+    // The colour to put under see-through parts of the picture before tearing them: the page's own
+    // background, adjusted so that it still matches once the canvas's CSS filter has been applied.
+    var galleryEl = document.getElementById("view-gallery");
+    function underColour() {
+      var bg = (getComputedStyle(galleryEl).backgroundColor.match(/[\d.]+/g) || [39, 36, 49]).map(Number);
+      var f = getComputedStyle(canvas).filter || "";
+      var kc = /contrast\(([\d.]+)\)/.exec(f), kb = /brightness\(([\d.]+)\)/.exec(f);
+      var k = kc ? +kc[1] : 1, b = kb ? +kb[1] : 1;
+      function inv(c) { return Math.max(0, Math.min(255, Math.round((((c / 255) / b - 0.5) / k + 0.5) * 255))); }
+      return "rgb(" + inv(bg[0]) + "," + inv(bg[1]) + "," + inv(bg[2]) + ")";
     }
     var hero = document.getElementById("hero");
     hero.addEventListener("pointermove", poke);
@@ -564,6 +584,9 @@
     // Strain fades when it is left alone. It trembles as strain grows, and at 1 it bursts.
     var strain = 0, lastSx = 0, lastSz = 0;
     var pop = null;      // the ring that marks where the head burst
+    var homing = null;   // the head flying back onto the figure's neck
+    var parked = false;  // sitting on the neck while the figure fades back in under it
+    var wakeX = 0, wakeY = 0; // where the head last tore the floor
     var nightT = 9;      // seconds since the figure came back
     var THREE_SRC = "js/vendor/three.min.js";
     var BG = 0x211e2a;           // the page colour in this mode; the skull fades into it with distance
@@ -716,10 +739,33 @@
       head.pk = 1; head.pkv = 0; head.shx = head.shz = head.shvx = head.shvz = 0; head.kd = 1;
       head.rest = 1;
       head.outer.visible = head.shadow.visible = true;
+      homing = null;
+      parked = false;
+    }
+    function neckSpot(out) { // the place in the 3D scene that lines up with the figure's own head
+      var at = figureHead(), r = aim(at.x, at.y);
+      var t = (H / 2) / Math.tan((head.camera.fov * Math.PI) / 360) / at.r * 1.06;
+      return out.copy(r.direction).multiplyScalar(t).add(r.origin);
+    }
+    function floorSpot() { // where the head touches the floor, on screen
+      head.v4.set(head.pos.x, 0, head.pos.z).project(head.camera);
+      return { x: (head.v4.x + 1) / 2 * W, y: (1 - head.v4.y) / 2 * H };
     }
     function stepHead(dt) {
       var p = head.pos, v = head.vel;
-      if (held && grabAt && !pinch) {
+      if (homing) { // "Put it back": it flies up to the neck in an arc, righting itself on the way
+        homing.t += dt;
+        var hu = Math.min(1, homing.t / 0.5), he = hu * hu * (3 - 2 * hu);
+        p.lerpVectors(homing.from, homing.to, he);
+        p.y += Math.sin(hu * Math.PI) * 1.6;
+        v.set(0, 0, 0);
+        head.w.set(0, 0, 0);
+        head.q.slerp(head.tmp.set(0, 0, 0, 1), Math.min(1, dt * 10));
+        if (hu >= 1) { homing = null; parked = true; head.sv += 6; glitchScreen(30); setSkull(false); }
+      } else if (parked) {
+        v.set(0, 0, 0);
+        head.w.set(0, 0, 0);
+      } else if (held && grabAt && !pinch) {
         // it follows the finger anywhere on the floor, lifted a little; its speed is the speed it is thrown with
         // the hand may go to the very edge of the screen, the head stops a little short of it
         var box = bounds();
@@ -786,11 +832,15 @@
       }
 
       var floor = REST * Math.min(1, head.s);
-      var onFloor = p.y <= floor;
+      var onFloor = p.y <= floor && !homing && !parked;
       if (onFloor) {
         if (v.y < -3) { // lands, squashes, bounces; a hard landing strains it
           if (v.y < -9) strain += Math.min(0.14, (-v.y - 9) * 0.02);
           head.sv -= -v.y * 0.5;
+          if (day && !bursting) { // the floor tears where it lands, harder the harder it hits
+            var hit = -v.y, fs2 = floorSpot();
+            spark(fs2.x, fs2.y, Math.min(14, Math.round(3 + hit * 0.7)), head.rpx * 1.1, 500 + hit * 80, Math.min(0.85, 0.3 + hit * 0.035), true);
+          }
           v.y = -v.y * 0.52;
         }
         else if (v.y < 0) v.y = 0;
@@ -811,12 +861,25 @@
       head.rpx = Math.abs((head.v3.x + 1) / 2 * W - px); // how big it is on screen right now
       if (!held) {
         var bx = bounds();
-        if (px < bx.l && v.x < 0) { v.x = -v.x * 0.7; head.sv += 3; }
-        if (px > bx.r && v.x > 0) { v.x = -v.x * 0.7; head.sv += 3; }
-        if (py > bx.b && v.z > 0) { v.z = -v.z * 0.7; head.sv += 3; }
+        var knock = 0;
+        if (px < bx.l && v.x < 0) { knock = Math.abs(v.x); v.x = -v.x * 0.7; head.sv += 3; }
+        if (px > bx.r && v.x > 0) { knock = Math.abs(v.x); v.x = -v.x * 0.7; head.sv += 3; }
+        if (py > bx.b && v.z > 0) { knock = Math.abs(v.z); v.z = -v.z * 0.7; head.sv += 3; }
+        if (knock > 3 && day && !bursting) spark(px, py, 5, head.rpx, 600, 0.45); // it also tears the picture where it hits the edge of the screen
         if (py < bx.t) { // the top of the screen is a ceiling in the air and a back wall on the floor
           if (v.y > 0) v.y = -v.y * 0.3;
           if (v.z < 0) v.z = -v.z * 0.7;
+        }
+      }
+      // rolling or dragged along the floor, it leaves a torn wake behind it
+      if (day && !bursting && !homing && !parked && !reduceMotion && p.y < REST + 0.7) {
+        var fs3 = floorSpot(), wd = Math.hypot(fs3.x - wakeX, fs3.y - wakeY);
+        if (wd > 400) { wakeX = fs3.x; wakeY = fs3.y; }
+        else if (wd > 16) {
+          var wk = Math.min(1, wd / (dt * 900)); // faster: a longer-lived, harder pull
+          trail.push({ x: fs3.x, y: fs3.y, vx: (fs3.x - wakeX) / dt, vy: (fs3.y - wakeY) / dt, life: 0.35 + 0.35 * wk, rk: 0.75 });
+          if (trail.length > 170) trail.splice(0, trail.length - 170);
+          wakeX = fs3.x; wakeY = fs3.y;
         }
       }
       stepBits(dt);
@@ -883,7 +946,7 @@
     }
     function onSkull(pt) { return aim(pt.x, pt.y).distanceToPoint(head.pos) < 1.5; }
     hero.addEventListener("pointerdown", function (e) {
-      if (!day || !head || bursting) return;
+      if (!day || !head || bursting || homing) return;
       var pt = local(e);
       touches[e.pointerId] = pt;
       var ids = Object.keys(touches);
@@ -896,6 +959,8 @@
         return;
       }
       if (!onSkull(pt)) return;
+      head.proj.copy(head.pos).project(head.camera);
+      spark((head.proj.x + 1) / 2 * W, (1 - head.proj.y) / 2 * H, 8, head.rpx * 1.1, 800, 0.42); // it glitches where it is touched
       held = true;
       grabAt = pt;
       downAt = { x: pt.x, y: pt.y, t: performance.now() };
@@ -1004,10 +1069,9 @@
           if (!head) { head = buildHead(); fitHead(); }
           if (day) {
             dropHead();
-            if (!reduceMotion) { // a few tears at the neck, nothing across the whole screen
-              var at = figureHead();
-              for (var i = 0; i < 7; i++) trail.push({ x: at.x + (Math.random() - 0.5) * at.r * 2, y: at.y + at.r * 0.9, vx: (Math.random() - 0.5) * 900, vy: 0, life: 0.45 });
-            }
+            var at = figureHead(); // the cut at the neck, and tears running down the body as it dissolves
+            spark(at.x, at.y + at.r * 0.9, 9, at.r * 1.2, 900, 0.55, true);
+            for (var i = 0; i < 8; i++) trail.push({ x: at.x + (Math.random() - 0.5) * at.r * 2.6, y: at.y + at.r * (1.2 + Math.random() * 3.2), vx: (Math.random() - 0.5) * 1400, vy: 120, life: 0.4 + Math.random() * 0.4 });
           }
         });
       } else {
@@ -1060,7 +1124,18 @@
         setSkull(false);
       }, 2500);
     }
-    if (dayBtn) dayBtn.addEventListener("click", function () { setSkull(!day); });
+    if (dayBtn) dayBtn.addEventListener("click", function () {
+      if (homing) return;
+      if (!day) { glitchScreen(16); setSkull(true); return; }
+      if (head && !bursting && !reduceMotion && head.outer.visible) { // the head flies back to the neck first, then the figure returns under it
+        held = false; pinch = null; touches = {};
+        hero.classList.remove("is-holding");
+        homing = { t: 0, from: head.pos.clone(), to: neckSpot(new window.THREE.Vector3()) };
+        return;
+      }
+      glitchScreen(30);
+      setSkull(false);
+    });
     window.addEventListener("resize", function () { size(); fitHead(); });
 
     function draw(now) {
@@ -1078,7 +1153,12 @@
         lastKey = key;
       } else lastKey = -2;
       dirty = false;
-      var g0 = torn ? bctx : ctx; // the clean frame goes straight to the screen unless it has to be torn first
+      // The clean frame goes straight to the screen unless it has to be torn first. Tearing needs a
+      // solid picture, so anything see-through (the fading figure, the 3D head and its shadow) is
+      // drawn on a layer of its own, then flattened onto the page colour for the torn cells to use.
+      var layered = torn && (day || nightT < 0.8);
+      if (layered && (tint.width !== buf.width || tint.height !== buf.height)) { tint.width = buf.width; tint.height = buf.height; }
+      var g0 = layered ? tctx : (torn ? bctx : ctx);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, W, H);
@@ -1090,6 +1170,12 @@
         bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         bctx.globalAlpha = 1;
         bctx.clearRect(0, 0, W, H);
+      }
+      if (layered) {
+        tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        tctx.globalAlpha = 1;
+        tctx.globalCompositeOperation = "source-over";
+        tctx.clearRect(0, 0, W, H);
       }
       if (day) {
         dayT += dt;
@@ -1145,7 +1231,12 @@
         g0.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
         g0.globalAlpha = 1;
       }
-      if (torn) ctx.drawImage(buf, 0, 0, W, H);
+      if (layered) {
+        bctx.fillStyle = underColour();
+        bctx.fillRect(0, 0, W, H);
+        bctx.drawImage(tint, 0, 0, W, H);
+        ctx.drawImage(tint, 0, 0, W, H);
+      } else if (torn) ctx.drawImage(buf, 0, 0, W, H);
 
       // 2. the wake. Every live point on the path adds its pull to a coarse grid of cells, so
       //    overlapping points build up instead of overwriting each other.
@@ -1159,7 +1250,7 @@
           p.life -= dt / LINGER;
           if (p.life <= 0) continue;
           var ease = p.life * p.life * (3 - 2 * p.life);       // settles gently at the end
-          var reach = REACH * (0.4 + 0.6 * ease);
+          var reach = REACH * (p.rk || 1) * (0.4 + 0.6 * ease);
           var speed = Math.hypot(p.vx, p.vy);
           var drag = Math.min(60, 10 + speed * PULL) * ease;
           var ux = speed > 1 ? p.vx / speed : 1, uy = speed > 1 ? p.vy / speed : 0;

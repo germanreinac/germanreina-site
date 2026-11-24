@@ -684,12 +684,12 @@ main { flex: 1; min-height: 0; position: relative; }
 .gallery.is-skull .hero.is-holding .hero__canvas { cursor: grabbing; }
 .gallery.is-skull .hero__stage { transform: none !important; }
 .gallery.is-switching .hero, .gallery.is-switching .gallery__foot { animation: flip-glitch 0.5s steps(1) both; }
-@keyframes flip-glitch {
-  0% { transform: translate(-10px, 0) skewX(-4deg); filter: invert(1); clip-path: inset(0 0 62% 0); }
+@keyframes flip-glitch { /* a jolt in torn strips; no inverted colours, which flashed white blocks */
+  0% { transform: translate(-10px, 0) skewX(-4deg); filter: saturate(1.8) hue-rotate(-25deg); clip-path: inset(0 0 62% 0); }
   14% { transform: translate(14px, 0); filter: none; clip-path: inset(38% 0 20% 0); }
-  28% { transform: translate(-6px, 3px) skewX(3deg); filter: invert(1); clip-path: inset(70% 0 0 0); }
+  28% { transform: translate(-6px, 3px) skewX(3deg); filter: saturate(1.8) hue-rotate(25deg); clip-path: inset(70% 0 0 0); }
   42% { transform: translate(8px, -2px); filter: none; clip-path: inset(12% 0 48% 0); }
-  58% { transform: translate(-3px, 0); filter: invert(1) hue-rotate(90deg); clip-path: none; }
+  58% { transform: translate(-3px, 0); filter: none; clip-path: none; }
   74% { transform: translate(2px, 0); filter: none; }
   100% { transform: none; filter: none; clip-path: none; }
 }
