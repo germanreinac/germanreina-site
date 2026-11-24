@@ -1318,7 +1318,7 @@
     var nodes = [], active = -1, opened = false, rot = 0, rotTo = 0, spinning = false;
     var vel = 0;                       // spin left over after a flick, in radians a second
     var gap = 0, gapTo = 0, gapK = -1; // how far the neighbours have parted, and around which name
-    var running = false, lastT = 0, seqT = 0;
+    var running = false, lastT = 0, seqT = 0, spread = 150;
     var R = 300, lineH = 50, slope = 1, ax = 200, ay = 300, showT = 0, pickedAt = 0, lastPointer = "mouse", dragged = false;
     var PREVIEW_DELAY = 300, hoverK = -1;
     var hoverable = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -1327,12 +1327,13 @@
     function layout() {
       for (var k = 0; k < SLOTS; k++) {
         var n = nodes[k], th = wrap(k * STEP - rot);
-        if (gapK >= 0 && k !== gapK && gap > 0) { // neighbours lean away from the chosen name
-          var d = wrap((k - gapK) * STEP), near = Math.max(0, 1 - Math.abs(d) / 1.1);
-          th += (d > 0 ? 1 : -1) * GAP * near * gap;
-        }
         var depth = Math.cos(th), y = R * Math.sin(th);
         var x = y * slope + (1 - depth) * R * 0.38; // the far side of the rim sits off to the right, so the wheel reads as a ring
+        if (gapK >= 0 && k !== gapK && gap > 0) { // the names before and after slide apart along the diagonal, leaving room for the thumbnail
+          var push = (wrap((k - gapK) * STEP) > 0 ? 1 : -1) * spread * gap;
+          y += push;
+          x += push * slope * 0.6;
+        }
         var z = R * (depth - 1);
         n.style.transform = "translate3d(" + (ax + x).toFixed(1) + "px," + (ay + y - lineH / 2).toFixed(1) + "px," + z.toFixed(1) + "px)" +
           (depth > 0 ? " rotateX(" + (-th * 0.5).toFixed(3) + "rad)" : "");
@@ -1394,19 +1395,22 @@
       showT = setTimeout(function () {
         shot.style.backgroundColor = it.tone || "";
         shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
-        tag.textContent = it.domain;
-        tag.style.fontSize = "calc(" + list.style.fontSize + " * 0.5)";
-        cap.textContent = it.note + (it.url ? (hoverable ? " · click to open" : " · tap again to open") : " · not live yet");
-        // the preview unfolds from the name: its top edge sits just under where the name is
+        cap.textContent = it.domain + " · " + it.note + (it.url ? (hoverable ? " · click to open" : " · tap again to open") : " · not live yet");
+        // The name itself becomes the thumbnail: the frame starts as a bar exactly the size of the
+        // word, in its place on the wheel, and grows from there into the gap the others have left.
         var r = nodes[k].getBoundingClientRect(), vr = view.getBoundingClientRect();
-        var fw = frame.offsetWidth, fh = frame.offsetHeight;
-        var nx = r.left - vr.left, ny = r.top - vr.top;
-        var left = Math.max(12, Math.min(vr.width - fw - 12, nx)), top = Math.max(96, Math.min(vr.height - fh - 44, ny + r.height * 0.62)); // room for the caption under it
+        var fw = frame.offsetWidth, fh = shot.offsetHeight;
+        var nx = r.left - vr.left, cy = r.top - vr.top + r.height / 2;
+        var left = Math.max(12, Math.min(vr.width - fw - 12, nx)), top = Math.max(70, Math.min(vr.height - fh - 44, cy - fh / 2));
         frame.style.left = left + "px";
         frame.style.top = top + "px";
-        frame.style.transformOrigin = Math.max(0, nx - left) + "px 0px";
+        frame.style.transformOrigin = Math.max(0, nx - left) + "px " + (cy - top) + "px";
+        frame.style.transition = "none";
+        frame.style.transform = "scale(" + (r.width / fw).toFixed(4) + "," + (r.height * 0.62 / fh).toFixed(4) + ")";
         void frame.offsetWidth;
+        frame.style.transition = "";
         frame.classList.add("is-in");
+        frame.style.transform = "scale(1)";
         opened = true;
         layout();
       }, reduceMotion ? 0 : turn + PART);
@@ -1446,6 +1450,7 @@
       list.style.fontSize = size + "px";
       list.style.perspective = Math.round(R * 4.2) + "px";
       list.style.perspectiveOrigin = ax + "px " + ay + "px";
+      spread = frame.offsetWidth * 0.3125 + lineH * 0.45; // half the thumbnail's height, and a little air
       layout();
     }
     footer(document.getElementById("play-foot"), false);

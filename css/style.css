@@ -822,28 +822,24 @@ main { flex: 1; min-height: 0; position: relative; }
   z-index: 3;
   left: 0;
   top: 0;
-  transform: scale(0.04, 0.02);
-  transition: transform 0.5s cubic-bezier(0.2, 0.85, 0.2, 1), opacity 0.2s ease;
+  width: min(40vw, 32rem, 70vh);
+  transition: transform 0.55s cubic-bezier(0.25, 0.9, 0.2, 1), opacity 0.12s ease;
 }
-.play.is-wheel .play__frame.is-in { transform: scale(1); }
 .play.is-wheel .play__frame.is-in .play__shot { animation: none; }
-.play.is-wheel .play__item { transition: opacity 0.3s ease; }
-.play.is-wheel .play__tag { /* the chosen name, shrunk to a small label sitting on top of its preview */
-  display: block;
+.play.is-wheel .play__shot { position: relative; }
+.play.is-wheel .play__shot::after { /* starts as solid ink, like the word it grew from, and clears to show the site */
+  content: "";
   position: absolute;
-  left: 0;
-  bottom: calc(100% + 6px);
-  color: var(--ink);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.04em;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateY(6px);
-  transition: opacity 0.25s ease 0.2s, transform 0.3s ease 0.2s;
+  inset: 0;
+  background: var(--ink);
+  opacity: 1;
+  transition: opacity 0.4s ease 0.12s;
 }
-.play.is-wheel .play__frame.is-in .play__tag { opacity: 1; transform: none; }
-.play.is-wheel .play__frame figcaption { position: absolute; left: 0; top: 100%; }
+.play.is-wheel .play__frame.is-in .play__shot::after { opacity: 0; }
+.play.is-wheel .play__item { transition: opacity 0.14s ease; }
+.play.is-wheel .play__frame figcaption { position: absolute; left: 0; top: 100%; right: 0; opacity: 0; transition: opacity 0.25s ease 0.35s; }
+.play.is-wheel .play__frame.is-in figcaption { opacity: 1; }
+@media (max-width: 720px) { .play.is-wheel .play__frame { width: min(76vw, 22rem); } }
 .play__cross, .play__xy { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; opacity: 0; }
 .play.has-cross .play__cross, .play.has-cross .play__xy { opacity: 1; }
 .play__cross--h { width: 100%; height: 1px; background: var(--line); }
