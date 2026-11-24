@@ -1316,6 +1316,9 @@
     var SLOTS = Math.ceil(30 / items.length) * items.length;  // the list repeats until the rim is full
     var STEP = (Math.PI * 2) / SLOTS, GAP = 0.2;              // GAP: how far neighbours part around a chosen name
     var nodes = [], active = -1, opened = false, rot = 0, rotTo = 0, spinning = false;
+    var vel = 0;                       // spin left over after a flick, in radians a second
+    var gap = 0, gapTo = 0, gapK = -1; // how far the neighbours have parted, and around which name
+    var running = false, lastT = 0, seqT = 0;
     var R = 300, lineH = 50, slope = 1, ax = 200, ay = 300, showT = 0, pickedAt = 0, lastPointer = "mouse", dragged = false;
     var PREVIEW_DELAY = 300, hoverK = -1;
     var hoverable = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -1324,9 +1327,9 @@
     function layout() {
       for (var k = 0; k < SLOTS; k++) {
         var n = nodes[k], th = wrap(k * STEP - rot);
-        if (active >= 0 && k !== active) { // neighbours lean away from the chosen name
-          var d = wrap((k - active) * STEP), near = Math.max(0, 1 - Math.abs(d) / 1.1);
-          th += (d > 0 ? 1 : -1) * GAP * near;
+        if (gapK >= 0 && k !== gapK && gap > 0) { // neighbours lean away from the chosen name
+          var d = wrap((k - gapK) * STEP), near = Math.max(0, 1 - Math.abs(d) / 1.1);
+          th += (d > 0 ? 1 : -1) * GAP * near * gap;
         }
         var depth = Math.cos(th), y = R * Math.sin(th);
         var x = y * slope + (1 - depth) * R * 0.38; // the far side of the rim sits off to the right, so the wheel reads as a ring
@@ -1335,7 +1338,7 @@
           (depth > 0 ? " rotateX(" + (-th * 0.5).toFixed(3) + "rad)" : "");
         var op = depth > 0 ? 0.16 + 0.84 * depth * depth : 0.07 + 0.09 * (1 + depth);
         var blur = depth > 0 ? (1 - depth) * 3.5 : 3.5 + -depth * 2.5;
-        if (active >= 0 && k !== active) { op *= 0.4; blur += 1; }
+        if (gapK >= 0 && k !== gapK) { op *= 1 - 0.6 * gap; blur += gap; }
         if (k === active) { op = opened ? 0 : 1; blur = 0; } // once the preview is open, the name lives in its corner
         n.style.opacity = op.toFixed(3);
         var b = Math.round(blur * 2) / 2;
@@ -1344,49 +1347,69 @@
         n.style.pointerEvents = depth > 0.5 ? "auto" : "none";
       }
     }
-    function tick() {
-      rot += (rotTo - rot) * 0.2;
-      if (Math.abs(rotTo - rot) < 0.0004) { rot = rotTo; spinning = false; }
+    function tick(now) {
+      var dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      if (vel) { // coasting after a flick: it slows down by itself, like a wheel with a little friction
+        rot += vel * dt;
+        rotTo = rot;
+        vel *= Math.exp(-dt * 2.6);
+        if (Math.abs(vel) < 0.04) vel = 0;
+      } else if (rot !== rotTo) {
+        rot += (rotTo - rot) * Math.min(1, dt * 11);
+        if (Math.abs(rotTo - rot) < 0.0004) rot = rotTo;
+      }
+      if (gap !== gapTo) { // the neighbours part, or close up again, over about a third of a second
+        gap += (gapTo - gap) * Math.min(1, dt * 10);
+        if (Math.abs(gapTo - gap) < 0.004) gap = gapTo;
+      }
+      spinning = vel !== 0 || rot !== rotTo;
       layout();
       if (!spinning && hoverK >= 0 && active < 0) setActive(hoverK, false);
-      if (spinning) requestAnimationFrame(tick);
+      if (spinning || gap !== gapTo) requestAnimationFrame(tick);
+      else running = false;
     }
-    function spin(to) {
-      rotTo = to;
-      if (reduceMotion) { rot = rotTo; layout(); return; }
-      if (!spinning) { spinning = true; requestAnimationFrame(tick); }
+    function kick() {
+      if (reduceMotion) { rot = rotTo; gap = gapTo; vel = 0; spinning = false; layout(); return; }
+      if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(tick); }
     }
+    function spin(to) { vel = 0; rotTo = to; spinning = rot !== rotTo; kick(); }
+    // Picking a name plays in clear steps: (a tap first turns the wheel to bring it to the front,)
+    // the neighbours part, then the name shrinks into a small label as its preview unfolds from it.
+    var TURN = 380, PART = 300;
     function setActive(k, recentre) {
       if (k === active) return;
       active = k;
       opened = false;
       pickedAt = performance.now();
       clearTimeout(showT);
+      clearTimeout(seqT);
       frame.classList.remove("is-in");
       view.classList.toggle("has-active", k >= 0);
-      if (k >= 0 && recentre) spin(rot + wrap(k * STEP - rot)); // a tap turns the wheel to bring it to the front
-      layout();
-      if (k < 0) return;
-      var it = items[k % items.length];
+      if (k < 0) { gapTo = 0; kick(); return; }
+      var it = items[k % items.length], turn = recentre && !reduceMotion ? TURN : 0;
+      gapK = k;
+      if (recentre) spin(rot + wrap(k * STEP - rot));
+      seqT = setTimeout(function () { gapTo = 1; kick(); }, turn);
       showT = setTimeout(function () {
         shot.style.backgroundColor = it.tone || "";
         shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
         tag.textContent = it.domain;
-        tag.style.fontSize = list.style.fontSize;
+        tag.style.fontSize = "calc(" + list.style.fontSize + " * 0.5)";
         cap.textContent = it.note + (it.url ? (hoverable ? " · click to open" : " · tap again to open") : " · not live yet");
-        // the preview opens out of the name: its corner sits where the name is, and it grows from there
+        // the preview unfolds from the name: its top edge sits just under where the name is
         var r = nodes[k].getBoundingClientRect(), vr = view.getBoundingClientRect();
         var fw = frame.offsetWidth, fh = frame.offsetHeight;
         var nx = r.left - vr.left, ny = r.top - vr.top;
-        var left = Math.max(12, Math.min(vr.width - fw - 12, nx - 14)), top = Math.max(60, Math.min(vr.height - fh - 12, ny - 10));
+        var left = Math.max(12, Math.min(vr.width - fw - 12, nx)), top = Math.max(96, Math.min(vr.height - fh - 44, ny + r.height * 0.62)); // room for the caption under it
         frame.style.left = left + "px";
         frame.style.top = top + "px";
-        frame.style.transformOrigin = (nx - left + 20) + "px " + (ny - top + r.height / 2) + "px";
+        frame.style.transformOrigin = Math.max(0, nx - left) + "px 0px";
         void frame.offsetWidth;
         frame.classList.add("is-in");
         opened = true;
         layout();
-      }, reduceMotion ? 0 : (recentre ? PREVIEW_DELAY : 90));
+      }, reduceMotion ? 0 : turn + PART);
     }
 
     for (var k = 0; k < SLOTS; k++) (function (k) {
@@ -1404,7 +1427,7 @@
         if (dragged) { e.preventDefault(); return; }
         if (lastPointer === "mouse" && active === k) return;
         if (active !== k) { e.preventDefault(); setActive(k, true); return; }
-        if (performance.now() - pickedAt < PREVIEW_DELAY + 250) e.preventDefault();
+        if (performance.now() - pickedAt < TURN + PART + 350) e.preventDefault(); // not until the preview has opened
       });
       n.addEventListener("keydown", function (e) { if (e.key === "Enter" && active !== k) { e.preventDefault(); setActive(k, true); } });
       list.appendChild(n);
@@ -1433,17 +1456,35 @@
     view.addEventListener("wheel", function (e) {
       e.preventDefault();
       if (active >= 0) setActive(-1);
-      spin(rotTo + (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * 0.0016);
+      spin(rotTo + (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * 0.0016); // eases to a stop after the last notch
     }, { passive: false });
-    var downY = null, lastY = 0;
-    view.addEventListener("pointerdown", function (e) { downY = lastY = e.clientY; dragged = false; });
-    function endDrag() { downY = null; }
+    var downY = null, lastY = 0, lastMove = 0, flick = 0;
+    view.addEventListener("pointerdown", function (e) {
+      downY = lastY = e.clientY;
+      dragged = false;
+      flick = 0;
+      if (vel) { vel = 0; rotTo = rot; } // a finger on a coasting wheel stops it
+    });
+    function endDrag() {
+      if (downY !== null && dragged) {
+        // let go while still moving and it coasts; hold still first and it stays put
+        vel = performance.now() - lastMove < 90 ? Math.max(-14, Math.min(14, flick)) : 0;
+        if (vel) kick();
+      }
+      downY = null;
+    }
     view.addEventListener("pointercancel", endDrag);
     window.addEventListener("pointerup", endDrag);
     view.addEventListener("pointermove", function (e) {
       if (downY !== null && e.pointerType !== "mouse") { // drag up and down to spin it
-        if (Math.abs(e.clientY - downY) > 8 && !dragged) { dragged = true; if (active >= 0) setActive(-1); }
-        if (dragged) { rot = rotTo = rot - (e.clientY - lastY) / R; layout(); }
+        if (Math.abs(e.clientY - downY) > 8 && !dragged) { dragged = true; lastMove = performance.now(); if (active >= 0) setActive(-1); }
+        if (dragged) {
+          var now = performance.now(), turned = -(e.clientY - lastY) / R, dtm = Math.max(4, now - lastMove) / 1000;
+          rot = rotTo = rot + turned;
+          flick = flick * 0.6 + (turned / dtm) * 0.4; // a running average of the finger's speed
+          lastMove = now;
+          layout();
+        }
         lastY = e.clientY;
       }
       if (e.pointerType !== "mouse") return;
