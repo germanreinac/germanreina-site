@@ -297,7 +297,7 @@
     heroOn = mode === "gallery";
     document.body.dataset.mode = mode;
     setBar();
-    if (mode === "play" && window.__playShown) window.__playShown();
+    if (mode === "play" && window.__playShown) { window.__playShown(); burst(document.querySelector("#view-play .index__title")); }
     if (mode === "index") burst(document.querySelector("#view-index .index__title"));
     if (heroVideo && !reduceMotion) { // only play while the home page is showing
       if (mode === "gallery") { var pl = heroVideo.play(); if (pl && pl.catch) pl.catch(function () {}); }
@@ -308,8 +308,8 @@
   // The bar floats over the full-screen views, and uses light text over the dark ones.
   function setBar() {
     var b = document.body, mode = b.dataset.mode;
-    var floats = mode === "gallery" || mode === "play";
-    var dark = mode === "play" || (mode === "gallery" && !b.classList.contains("is-day"));
+    var floats = mode === "gallery";
+    var dark = mode === "gallery" && !b.classList.contains("is-day");
     if (floats) b.dataset.float = "1"; else delete b.dataset.float;
     if (dark) b.dataset.dark = "1"; else delete b.dataset.dark;
   }
@@ -510,7 +510,7 @@
     }
 
     /* ---- day mode: the page turns off-white and the head drops in, to be thrown about like a ball ---- */
-    var day = false, head = null, held = false, grabAt = null;
+    var day = false, dayT = 9, head = null, held = false, grabAt = null;
     var THREE_SRC = "js/vendor/three.min.js";
     function loadThree(done) {
       if (window.THREE) { done(); return; }
@@ -520,6 +520,10 @@
       document.head.appendChild(s);
     }
     // A provisional head built from simple shapes. Swap this for the real model when it is exported.
+    // The camera sits a little above a floor and looks down at it, so the head can be rolled
+    // towards you, away from you and sideways.
+    var FAR = -9, NEAR = 1.5; // how far back and how close the head may roll
+    var REST = 0.88; // height of the head's centre when it lies on the floor (its radius is 1)
     function buildHead() {
       var THREE = window.THREE, renderer;
       try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); }
@@ -528,10 +532,9 @@
       var scene = new THREE.Scene();
       scene.add(new THREE.AmbientLight(0xffffff, 0.78));
       var sun = new THREE.DirectionalLight(0xffffff, 0.42);
-      sun.position.set(-0.6, 1, 1.4);
+      sun.position.set(-0.6, 1.6, 1.2);
       scene.add(sun);
-      var camera = new THREE.OrthographicCamera(0, 1, 1, 0, 0.1, 6000);
-      camera.position.z = 3000;
+      var camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
       function mat(c) { return new THREE.MeshLambertMaterial({ color: c }); }
       function ball(r, c, x, y, z, sx, sy, sz) {
         var b = new THREE.Mesh(new THREE.SphereGeometry(r, 40, 28), mat(c));
@@ -550,71 +553,98 @@
       g.add(ball(0.095, 0xffe45e, 0.42, 0.12, 0.88));
       g.add(ball(1, 0xb9a2e6, 0, -0.3, 0.8, 0.5, 0.19, 0.2));               // mouth
       scene.add(g);
-      return { renderer: renderer, scene: scene, camera: camera, group: g, x: 0, y: 0, vx: 0, vy: 0, R: 100, spin: 0, q: new THREE.Quaternion(), tmp: new THREE.Quaternion(), ax: new THREE.Vector3() };
+      var shadow = new THREE.Mesh(
+        new THREE.CircleGeometry(1.2, 40),
+        new THREE.MeshBasicMaterial({ color: 0x1f1a24, transparent: true, opacity: 0.2, depthWrite: false })
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      scene.add(shadow);
+      return {
+        renderer: renderer, scene: scene, camera: camera, group: g, shadow: shadow,
+        pos: new THREE.Vector3(0, REST, 0), vel: new THREE.Vector3(), w: new THREE.Vector3(),
+        q: new THREE.Quaternion(), tmp: new THREE.Quaternion(), ax: new THREE.Vector3(),
+        ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), hit: new THREE.Vector3(), proj: new THREE.Vector3(),
+        plane: new THREE.Plane(new THREE.Vector3(0, 1, 0), -(REST + 0.45))
+      };
     }
     function fitHead() {
       if (!head) return;
+      var tall = W / H < 0.8;
       head.renderer.setPixelRatio(dpr);
       head.renderer.setSize(W, H, false);
-      head.camera.right = W;
-      head.camera.top = H;
+      head.camera.aspect = W / H;
+      head.camera.fov = tall ? 50 : 30;
+      head.camera.position.set(0, tall ? 6.5 : 5.2, tall ? 17 : 14.5);
+      head.camera.lookAt(0, tall ? -1.2 : 0.4, -1.5);
       head.camera.updateProjectionMatrix();
-      head.R = Math.max(58, Math.min(130, Math.min(W, H) * 0.14));
+      head.camera.updateMatrixWorld();
+    }
+    function aim(x, y) { // a ray from the camera through a point on the screen
+      head.ndc.set((x / W) * 2 - 1, 1 - (y / H) * 2);
+      head.ray.setFromCamera(head.ndc, head.camera);
+      return head.ray.ray;
+    }
+    // Where the figure's head is on screen in the video, so the 3D head can start exactly there.
+    function figureHead() {
+      var sw = heroVideo.videoWidth || 1280, sh = heroVideo.videoHeight || 720, tall = W / H < 0.8;
+      var scale = Math.max(W / sw, H / sh) * (tall ? 0.74 : 1);
+      return { x: W * 0.5, y: H * (tall ? 0.56 : 0.5) - sh * scale * 0.17 };
     }
     function dropHead() {
       if (!head) return;
-      head.x = W * (W / H < 0.8 ? 0.5 : 0.64);
-      head.y = -head.R * 2;
-      head.vx = 90;
-      head.vy = 0;
-      head.spin = -1.2;
+      // it pops off the body: starts where the figure's head is, jumps, and falls to the floor
+      var at = figureHead(), r = aim(at.x, at.y);
+      var t = -r.origin.z / r.direction.z;
+      head.pos.copy(r.direction).multiplyScalar(t).add(r.origin);
+      if (head.pos.y < REST) head.pos.y = REST;
+      head.vel.set((Math.random() - 0.5) * 4, 8, 0.8);
+      head.w.set(5, 0, (Math.random() - 0.5) * 7);
       head.q.set(0, 0, 0, 1);
-      turn(0, 1, 0, -0.5);
     }
-    function turn(x, y, z, angle) { // rotate the head about a screen axis
-      head.tmp.setFromAxisAngle(head.ax.set(x, y, z), angle);
-      head.q.premultiply(head.tmp);
-    }
-    var EDGE = 0.037; // the canvas is a little larger than the screen, by this share on each side
-    function groundY() { return H * (1 - EDGE) - 64; }
     function stepHead(dt) {
-      var R = head.R, floor = groundY() - R * 0.86;
+      var p = head.pos, v = head.vel;
       if (held && grabAt) {
-        // follows the finger; the speed it is moved at is the speed it is thrown with
-        head.vx = (grabAt.x - head.x) * 16;
-        head.vy = (grabAt.y - head.y) * 16;
-        head.x += head.vx * dt;
-        head.y += head.vy * dt;
-      } else {
-        head.vy += 2600 * dt;
-        head.x += head.vx * dt;
-        head.y += head.vy * dt;
-        turn(0, 0, 1, head.spin * dt);
-      }
-      if (head.y > floor) { // the ground
-        head.y = floor;
-        if (head.vy > 0) head.vy = head.vy > 220 ? -head.vy * 0.48 : 0;
-        if (!held) {
-          head.vx *= Math.pow(0.35, dt);
-          head.spin = -head.vx / R;  // rolls
-          if (Math.abs(head.vx) < 4) head.vx = 0;
+        // it follows the finger across the floor, lifted a little; its speed is the speed it is thrown with
+        if (aim(grabAt.x, grabAt.y).intersectPlane(head.plane, head.hit)) {
+          var tz = Math.max(FAR, Math.min(NEAR, head.hit.z));
+          v.x = (head.hit.x - p.x) * 14;
+          v.z = (tz - p.z) * 14;
+          v.y = (REST + 0.45 - p.y) * 14;
         }
-      } else if (!held) {
-        head.spin *= Math.pow(0.7, dt);
+      } else {
+        v.y -= 30 * dt;
       }
-      var wallL = W * EDGE + R * 1.3, wallR = W * (1 - EDGE) - R * 1.3; // room for the ears
-      if (head.x < wallL) { head.x = wallL; head.vx = Math.abs(head.vx) * 0.6; }
-      if (head.x > wallR) { head.x = wallR; head.vx = -Math.abs(head.vx) * 0.6; }
-      if (head.y < -H) { head.y = -H; head.vy = 0; }
-      head.group.position.set(head.x, H - head.y, 0);
-      head.group.scale.setScalar(R);
+      p.addScaledVector(v, dt);
+      var onFloor = p.y <= REST;
+      if (onFloor) {
+        p.y = REST;
+        if (v.y < 0) v.y = v.y < -3 ? -v.y * 0.45 : 0;
+        if (!held) { var f = Math.pow(0.32, dt); v.x *= f; v.z *= f; }
+      }
+      if (onFloor || held) head.w.set(v.z, 0, -v.x); // rolls the way it travels
+      var turn = head.w.length() * dt;
+      if (turn > 1e-5) {
+        head.tmp.setFromAxisAngle(head.ax.copy(head.w).normalize(), turn);
+        head.q.premultiply(head.tmp);
+      }
+      // stays on the part of the floor you can see
+      if (p.z < FAR) { p.z = FAR; v.z = Math.abs(v.z) * 0.6; }
+      if (p.z > NEAR) { p.z = NEAR; v.z = -Math.abs(v.z) * 0.6; }
+      head.proj.copy(p).project(head.camera);
+      if (head.proj.x < -0.8 && v.x < 0) v.x = -v.x * 0.6;
+      if (head.proj.x > 0.8 && v.x > 0) v.x = -v.x * 0.6;
+      head.group.position.copy(p);
       head.group.quaternion.copy(head.q);
+      var lift = p.y - REST;
+      head.shadow.position.set(p.x, 0.01, p.z);
+      head.shadow.scale.setScalar(1 / (1 + lift * 0.3));
+      head.shadow.material.opacity = 0.2 / (1 + lift * 0.7);
       head.renderer.render(head.scene, head.camera);
     }
     hero.addEventListener("pointerdown", function (e) {
       if (!day || !head) return;
       var r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-      if (Math.hypot(x - head.x, y - head.y) > head.R * 1.15) return;
+      if (aim(x, y).distanceToPoint(head.pos) > 1.4) return;
       held = true;
       grabAt = { x: x, y: y };
       hero.classList.add("is-holding");
@@ -622,21 +652,22 @@
     });
     hero.addEventListener("pointermove", function (e) {
       if (!held) return;
-      var r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-      turn(0, 1, 0, (x - grabAt.x) * 0.012); // dragging also turns it in your hand
-      turn(1, 0, 0, (y - grabAt.y) * 0.012);
-      grabAt = { x: x, y: y };
+      var r = canvas.getBoundingClientRect();
+      grabAt = { x: e.clientX - r.left, y: e.clientY - r.top };
     });
     function letGo() {
       if (!held) return;
       held = false;
       hero.classList.remove("is-holding");
-      head.spin = -head.vx / head.R;
     }
     hero.addEventListener("pointerup", letGo);
     hero.addEventListener("pointercancel", letGo);
 
-    window.__head = function () { return head ? { x: Math.round(head.x), y: Math.round(head.y), R: Math.round(head.R) } : null; }; // for poking at it from the console
+    window.__head = function () { // for poking at it from the console: where it is on screen and on the floor
+      if (!head) return null;
+      head.proj.copy(head.pos).project(head.camera);
+      return { x: Math.round((head.proj.x + 1) / 2 * W), y: Math.round((1 - head.proj.y) / 2 * H), fx: +head.pos.x.toFixed(2), fy: +head.pos.y.toFixed(2), fz: +head.pos.z.toFixed(2) };
+    };
     var dayBtn = document.getElementById("daybtn");
     if (dayBtn) dayBtn.addEventListener("click", function () {
       day = !day;
@@ -660,6 +691,7 @@
       }
       if (day) {
         heroVideo.pause();
+        dayT = 0;
         loadThree(function () {
           if (!head) { head = buildHead(); fitHead(); }
           dropHead();
@@ -677,7 +709,8 @@
       var dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       if (canvas.clientWidth !== W || canvas.clientHeight !== H) { size(); fitHead(); }
-      var src = day ? null : (heroVideo.readyState >= 2 ? heroVideo : (poster.complete && poster.naturalWidth ? poster : null));
+      var frame = heroVideo.readyState >= 2 ? heroVideo : (poster.complete && poster.naturalWidth ? poster : null);
+      var src = day ? null : frame;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, W, H);
@@ -689,14 +722,29 @@
       bctx.globalAlpha = 1;
       bctx.clearRect(0, 0, W, H);
       if (day) {
+        dayT += dt;
+        if (frame && dayT < 0.5) { // the body lingers for a moment after the head leaves it
+          var fw = frame.videoWidth || frame.naturalWidth, fh = frame.videoHeight || frame.naturalHeight;
+          var ftall = W / H < 0.8, fs = Math.max(W / fw, H / fh) * (ftall ? 0.74 : 1), fy = H * (ftall ? 0.56 : 0.5);
+          bctx.globalAlpha = 0.85 * (1 - dayT / 0.5);
+          bctx.drawImage(frame, cx - (fw * fs) / 2, fy - (fh * fs) / 2, fw * fs, fh * fs);
+          bctx.globalAlpha = 1;
+          // soft-edged, so it dissolves instead of leaving a hard shape
+          var mrx = fh * fs * 0.3, mry = fh * fs * 0.46;
+          bctx.globalCompositeOperation = "destination-in";
+          bctx.save();
+          bctx.translate(cx, fy);
+          bctx.scale(mrx / mry, 1);
+          var mg = bctx.createRadialGradient(0, 0, mry * 0.3, 0, 0, mry);
+          mg.addColorStop(0, "rgba(0,0,0,1)");
+          mg.addColorStop(1, "rgba(0,0,0,0)");
+          bctx.fillStyle = mg;
+          bctx.fillRect(-mry * 4, -mry * 4, mry * 8, mry * 8);
+          bctx.restore();
+          bctx.globalCompositeOperation = "source-over";
+        }
         if (head) {
           stepHead(dt);
-          // its shadow on the ground, smaller and fainter the higher it is
-          var lift = Math.max(0, Math.min(1, (groundY() - head.R * 0.86 - head.y) / (H * 0.6)));
-          bctx.fillStyle = "rgba(31,26,36," + (0.2 * (1 - lift)).toFixed(3) + ")";
-          bctx.beginPath();
-          bctx.ellipse(head.x, groundY(), head.R * (1.05 - lift * 0.5), head.R * 0.16 * (1 - lift * 0.5), 0, 0, 6.2832);
-          bctx.fill();
           bctx.drawImage(head.renderer.domElement, 0, 0, W, H);
         }
       } else {
@@ -854,75 +902,71 @@
     indexNote.appendChild(document.createTextNode(" for now."));
   }
 
-  /* Play: the interactive sites, as a column of names crossing the screen on a slant.
-     Scrolling slides the column. Pointing at a name pushes the others away, up and down,
-     and shows that site behind it. */
+  /* Play: the interactive sites, in the same light style as the Index. The names step down
+     and to the right like a staircase. Pointing at one (or tapping it) nudges the others
+     apart so it reads clearly, and shows a framed preview of the site. */
   function buildPlay() {
     var view = document.getElementById("view-play"), items = site.play;
     if (!view || !items) return;
-    var list = document.getElementById("play-list"), preview = document.getElementById("play-preview"), meta = document.getElementById("play-meta");
-    var nodes = [], active = -1, offset = 0, placed = false;
+    var list = document.getElementById("play-list"), frame = document.getElementById("play-frame");
+    var shot = document.getElementById("play-shot"), cap = document.getElementById("play-cap");
+    var nodes = [], active = -1;
     var touch = window.matchMedia("(pointer: coarse)").matches;
-    var idle = touch ? "drag to move the list · tap a name, tap again to open it" : "scroll to move the list · point at a name";
-    meta.textContent = idle;
 
     function setActive(i) {
       if (i === active) return;
       active = i;
       nodes.forEach(function (n, k) {
         n.classList.toggle("is-active", k === i);
-        n.style.transform = i < 0 || k === i ? "" : "translateY(" + (k < i ? -95 : 95) + "vh)";
+        n.style.setProperty("--push", i < 0 || k === i ? "0" : (k < i ? "-1" : "1"));
       });
       view.classList.toggle("has-active", i >= 0);
-      if (i < 0) { meta.textContent = idle; return; }
+      if (i < 0) return;
       var it = items[i];
-      preview.style.backgroundColor = it.tone || "";
-      preview.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
-      preview.textContent = it.image ? "" : it.domain;
-      meta.textContent = it.note + (it.url ? "" : " · not live yet");
+      shot.style.backgroundColor = it.tone || "";
+      shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
+      shot.textContent = it.image ? "" : it.domain;
+      cap.textContent = it.note + (it.url ? "" : " · not live yet");
+      // the frame sits in the empty corner opposite the name
+      frame.classList.toggle("is-low", i < items.length / 2);
+      frame.classList.remove("is-in");
+      void frame.offsetWidth;
+      frame.classList.add("is-in");
       burst(nodes[i]);
     }
     items.forEach(function (it, i) {
       var n = it.url ? outLink("", it.url, "play__item") : el("span", "play__item play__item--soon");
       n.textContent = it.domain;
-      n.setAttribute("data-n", (i < 9 ? "0" : "") + (i + 1));
+      n.style.setProperty("--i", i);
       glitch(n);
       n.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse") setActive(i); });
       n.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") setActive(-1); });
       n.addEventListener("focus", function () { setActive(i); });
-      n.addEventListener("blur", function () { setActive(-1); });
+      n.addEventListener("blur", function () { if (!touch) setActive(-1); });
       n.addEventListener("click", function (e) { // on touch the first tap picks it, the second opens it
-        if (dragged) { e.preventDefault(); return; }
         if (touch && active !== i) { e.preventDefault(); setActive(i); }
       });
       list.appendChild(n);
       nodes.push(n);
     });
 
-    function span() { return Math.max(0, list.offsetHeight - nodes[0].offsetHeight); }
-    function place() { list.style.transform = "translate(-50%, " + (offset - nodes[0].offsetHeight / 2).toFixed(1) + "px)"; }
-    function move(by) {
-      offset = Math.max(-span(), Math.min(0, offset + by));
-      place();
+    // Size the type and the steps so the staircase runs from one side of the screen to the other.
+    function fit() {
+      if (view.hidden) return;
+      var w = list.clientWidth, h = list.clientHeight, n = nodes.length;
+      var size = Math.min(w * 0.062, h / (n * 1.5), 76);
+      size = Math.max(size, 20);
+      list.style.fontSize = size + "px";
+      var widest = 0;
+      nodes.forEach(function (node) { widest = Math.max(widest, node.offsetWidth); });
+      if (widest > w) { size *= w / widest; list.style.fontSize = size + "px"; widest = w; }
+      list.style.setProperty("--step", (n > 1 ? Math.max(0, (w - widest) / (n - 1)) : 0) + "px");
     }
-    window.__playShown = function () {
-      if (!placed) { placed = true; offset = -span() / 2; }
-      place();
-    };
-    window.addEventListener("resize", function () { if (placed) move(0); });
-    view.addEventListener("wheel", function (e) {
-      e.preventDefault();
-      if (active >= 0) setActive(-1);
-      move(-(Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * 0.7);
-    }, { passive: false });
-    var downY = null, lastY = 0, dragged = false;
-    view.addEventListener("pointerdown", function (e) { downY = lastY = e.clientY; dragged = false; });
+    window.__playShown = fit;
+    window.addEventListener("resize", fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+
     view.addEventListener("pointermove", function (e) {
-      if (downY !== null && e.pointerType !== "mouse") {
-        if (Math.abs(e.clientY - downY) > 8) { dragged = true; if (active >= 0) setActive(-1); }
-        if (dragged) move(e.clientY - lastY);
-        lastY = e.clientY;
-      }
       if (e.pointerType !== "mouse") return;
       // cross-hair that spans the screen
       var r = view.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
@@ -933,7 +977,6 @@
       xy.textContent = "x " + ("000" + Math.round(x)).slice(-4) + "  y " + ("000" + Math.round(y)).slice(-4);
       xy.style.transform = "translate(" + (x + 12) + "px," + (y + 10) + "px)";
     });
-    window.addEventListener("pointerup", function () { downY = null; });
     view.addEventListener("pointerleave", function () { view.classList.remove("has-cross"); });
     view.addEventListener("click", function (e) { if (touch && !e.target.closest(".play__item")) setActive(-1); });
   }

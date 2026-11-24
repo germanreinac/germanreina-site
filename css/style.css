@@ -671,100 +671,98 @@ main { flex: 1; min-height: 0; position: relative; }
   .gallery__hint { text-align: right; }
 }
 
-/* ---------- play: a slanted column of sites ---------- */
+/* ---------- play: a staircase of sites, in the Index's light style ---------- */
 .play {
   position: relative;
-  overflow: hidden;
-  background: var(--space);
-  color: var(--star);
-  cursor: crosshair;
-  touch-action: none;
-}
-.play__preview {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding: 0 4vw 9vh;
-  background-size: cover;
-  background-position: center top;
-  color: rgba(245, 245, 241, 0.5);
-  font-size: clamp(3rem, 13vw, 11rem);
-  font-weight: 800;
-  letter-spacing: -0.05em;
-  line-height: 0.85;
-  text-align: right;
-  opacity: 0;
-  transition: opacity 0.35s ease;
-}
-.play__preview::after { content: ""; position: absolute; inset: 0; background: rgba(23, 21, 29, 0.62); }
-.play.has-active .play__preview { opacity: 1; }
-.play__col {
-  position: absolute;
-  left: 50%;
-  top: 52%;
-  width: 0;
-  height: 0;
-  transform: rotate(-13deg);
-}
-.play__list {
-  position: absolute;
-  left: 0;
-  top: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: crosshair;
+  padding-block: clamp(24px, 5vw, 56px) clamp(20px, 4vw, 40px);
+  padding-left: max(16px, 6vw, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, 6vw, env(safe-area-inset-right, 0px));
+}
+.play__head { flex: none; position: relative; z-index: 2; }
+.play__note { margin: 10px 0 0; font-family: var(--mono); font-size: 0.8rem; color: var(--ink-soft); }
+.play__list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: flex-start;
-  width: max-content;
-  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+  margin-top: clamp(12px, 3vh, 32px);
 }
 .play__item {
+  --push: 0;
+  position: relative;
+  z-index: 2;
   display: block;
-  padding: 0.04em 0.5em 0.04em 0.5em;
-  color: var(--star);
-  font-size: clamp(1.9rem, 6.6vw, 5.4rem);
+  margin-left: calc(var(--i) * var(--step, 0px));   /* each name one step further right */
+  padding: 0.12em 0.18em;
+  color: var(--ink);
   font-weight: 800;
-  line-height: 1.04;
+  line-height: 1.02;
   letter-spacing: -0.04em;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: transform 0.55s cubic-bezier(0.2, 0.75, 0.15, 1), color 0.2s, opacity 0.3s;
+  /* the names above and below the chosen one move apart by a little over half a line */
+  transform: translateY(calc(var(--push) * 0.62em));
+  transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.15s, opacity 0.25s;
 }
-.play__item::before { /* the glitch uses ::before while it plays; the number sits in an attribute on the left otherwise */
-  content: attr(data-n);
+.play.has-active .play__item:not(.is-active) { opacity: 0.32; }
+.play__item--soon { color: var(--ink-soft); cursor: default; }
+.play__item.is-active { color: var(--ink); background: var(--accent); z-index: 4; }
+.play__frame {
   position: absolute;
-  left: 0;
-  top: 0.5em;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  font-weight: 400;
-  letter-spacing: 0;
-  color: var(--star-soft);
-}
-.play__item.is-glitching::before { content: attr(data-text); left: 0; top: 0; font: inherit; letter-spacing: inherit; }
-.play__item.is-glitching::after { mix-blend-mode: screen; }
-.play__item--soon { color: var(--star-soft); cursor: default; }
-.play__item.is-active { color: var(--accent); }
-.play__item:focus-visible { outline-color: var(--star); }
-.play__meta {
-  position: absolute;
-  left: max(16px, env(safe-area-inset-left, 0px));
-  right: max(16px, env(safe-area-inset-right, 0px));
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 3;
+  right: max(16px, 6vw);
+  top: clamp(24px, 5vw, 56px);
+  width: min(30vw, 27rem);
   margin: 0;
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--star-soft);
+  opacity: 0;
   pointer-events: none;
 }
-.play__cross, .play__xy { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; }
+.play__frame.is-low { top: auto; right: auto; left: max(16px, 6vw); bottom: clamp(20px, 4vw, 40px); }
+.play.has-active .play__frame { opacity: 1; }
+.play__shot {
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: flex-end;
+  padding: 14px 16px;
+  border: 1px solid var(--ink);
+  background-size: cover;
+  background-position: center top;
+  color: rgba(31, 26, 36, 0.55);
+  font-size: clamp(1.1rem, 2.6vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  overflow: hidden;
+}
+.play__frame figcaption { margin-top: 6px; background: var(--paper); font-family: var(--mono); font-size: 0.74rem; color: var(--ink-soft); }
+.play__frame.is-in .play__shot { animation: frame-in 0.34s steps(1) both; }
+@keyframes frame-in { /* opens in a few torn strips, then holds still */
+  0% { clip-path: inset(0 0 78% 0); transform: translateX(-10px); }
+  25% { clip-path: inset(34% 0 30% 0); transform: translateX(8px); }
+  50% { clip-path: inset(0 0 22% 0); transform: translateX(-4px); }
+  75% { clip-path: inset(0 0 0 0); transform: translateX(2px); }
+  100% { clip-path: inset(0 0 0 0); transform: none; }
+}
+.play__cross, .play__xy { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; opacity: 0; }
 .play.has-cross .play__cross, .play.has-cross .play__xy { opacity: 1; }
-.play__cross--h { width: 100%; height: 1px; background: rgba(236, 238, 234, 0.4); }
-.play__cross--v { width: 1px; height: 100%; background: rgba(236, 238, 234, 0.4); }
-.play__xy { font-family: var(--mono); font-size: 0.66rem; color: var(--star-soft); white-space: pre; }
-@media (max-width: 720px) { .play__col { transform: rotate(-16deg); } }
-@media (prefers-reduced-motion: reduce) { .play__item, .play__list { transition: none; } }
+.play__cross--h { width: 100%; height: 1px; background: var(--line); }
+.play__cross--v { width: 1px; height: 100%; background: var(--line); }
+.play__xy { font-family: var(--mono); font-size: 0.66rem; color: var(--ink-soft); white-space: pre; }
+@media (max-width: 720px) {
+  .play__frame { width: min(64vw, 20rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .play__item { transition: none; }
+  .play__frame.is-in .play__shot { animation: none; }
+}
 
 /* ---------- the four doors under the name ---------- */
 .walk__doors {
