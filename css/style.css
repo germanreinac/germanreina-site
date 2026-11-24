@@ -768,7 +768,7 @@ main { flex: 1; min-height: 0; position: relative; }
   white-space: nowrap;
   cursor: pointer;
   /* the names before and after the chosen one fly away from it along the staircase's own diagonal */
-  transform: translate(calc(var(--push) * var(--step, 0px) * 2.4), calc(var(--push) * var(--line, 1.22em) * 2.4));
+  transform: translate(calc(var(--push) * var(--step, 0px) * 0.85), calc(var(--push) * var(--line, 1.22em) * 0.85));
   transition: transform 0.55s cubic-bezier(0.2, 1.5, 0.35, 1), opacity 0.25s, filter 0.25s;
 }
 .play.has-active .play__item:not(.is-active) { opacity: 0.3; filter: blur(1.5px); }
@@ -910,8 +910,8 @@ main { flex: 1; min-height: 0; position: relative; }
   position: fixed;
   left: 0;
   top: 0;
-  z-index: 6;
-  width: min(26vw, 22rem);
+  z-index: 0; /* behind the list, so the rows stay readable over it */
+  width: min(31vw, 26.5rem);
   aspect-ratio: 16 / 10;
   display: flex;
   align-items: flex-end;
@@ -930,7 +930,9 @@ main { flex: 1; min-height: 0; position: relative; }
   transition: opacity 0.15s ease;
   will-change: transform;
 }
-.peek.is-on { opacity: 1; }
+.peek.is-on { opacity: 0.7; }
+.index__wrap { position: relative; z-index: 1; }
+#view-index .row:hover, #view-index .row:focus-visible { background: rgba(255, 107, 154, 0.5); } /* lets the preview show through the highlighted row */
 
 /* ---------- project sheet ---------- */
 .sheet {

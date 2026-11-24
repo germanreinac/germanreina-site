@@ -228,7 +228,8 @@
     // With a mouse, a framed preview of the project rides along with the pointer while it is on a row.
     var peek = el("div", "peek");
     peek.setAttribute("aria-hidden", "true");
-    document.body.appendChild(peek);
+    var indexView = document.getElementById("view-index");
+    indexView.insertBefore(peek, indexView.firstChild);
     table.addEventListener("pointermove", function (e) {
       var r = e.pointerType === "mouse" ? e.target.closest(".row") : null;
       if (!r) { peek.classList.remove("is-on"); return; }
@@ -583,15 +584,15 @@
       renderer.setClearColor(0x000000, 0);
       var scene = new THREE.Scene();
       scene.fog = new THREE.Fog(BG, 17, 46);
-      scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+      scene.add(new THREE.AmbientLight(0xffffff, 0.5));
       var sun = new THREE.DirectionalLight(0xffffff, 0.5);
       sun.position.set(-0.6, 1.6, 1.2);
       scene.add(sun);
-      var rim = new THREE.DirectionalLight(0xff6b9a, 0.35); // a pink edge light, the figure's colour
+      var rim = new THREE.DirectionalLight(0xb3264e, 0.6); // crimson from the side, like the shadows on the figure
       rim.position.set(1.5, 0.4, -1);
       scene.add(rim);
       var camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
-      var bone = new THREE.MeshPhongMaterial({ color: 0xf1ebe4, shininess: 90, specular: 0x666666 }); // glossy, like jelly
+      var bone = new THREE.MeshPhongMaterial({ color: 0xd8ccd4, shininess: 18, specular: 0x1a1a1a });
       var hole = new THREE.MeshBasicMaterial({ color: 0x17151d });
       function ball(mat, r, x, y, z, sx, sy, sz) {
         var b = new THREE.Mesh(new THREE.SphereGeometry(r, 40, 28), mat);
@@ -600,8 +601,9 @@
         return b;
       }
       // the head you play with: glossy, like jelly
-      function jelly(c) { return new THREE.MeshPhongMaterial({ color: c, shininess: 110, specular: 0x777777 }); }
-      var pink = jelly(0xffb1d0), green = jelly(0x8fd9b6), yellow = jelly(0xffe45e), mouth = jelly(0xb9a2e6);
+      function jelly(c) { return new THREE.MeshPhongMaterial({ color: c, shininess: 14, specular: 0x1c1c1c }); } // soft, almost matte
+      // the figure is one colour all over, so the head is too; eyes and mouth are a darker shade of it
+      var pink = jelly(0xc79cc4), green = pink, yellow = jelly(0x8f5f8c), mouth = yellow;
       var face = new THREE.Group();
       face.add(ball(pink, 1, 0, 0, 0, 1.06, 0.88, 0.96));                         // skull
       face.add(ball(pink, 0.5, -1.08, 0.04, 0, 0.8, 1, 0.62));                    // ears
@@ -628,12 +630,12 @@
       var g = new THREE.Group();
       g.add(face, skull);
       // the lumps of jelly the head breaks into
-      var bits = [], lump = new THREE.SphereGeometry(1, 14, 10);
+      var bits = [], lump = new THREE.SphereGeometry(1, 30, 20);
       for (var bi = 0; bi < 26; bi++) {
-        var bm = new THREE.Mesh(lump, bi % 6 === 0 ? green : (bi % 13 === 5 ? yellow : pink));
+        var bm = new THREE.Mesh(lump, pink);
         bm.visible = false;
         scene.add(bm);
-        bits.push({ mesh: bm, vel: new THREE.Vector3(), r: 0.2, age: 9 });
+        bits.push({ mesh: bm, vel: new THREE.Vector3(), r: 0.2, age: 9, down: false, spread: 0 });
       }
       var outer = new THREE.Group(); // carries position and the jelly squash; the inner group carries the rolling
       outer.add(g);
@@ -848,24 +850,26 @@
       var r = head.rpx;
       return { l: W * EDGE + r, r: W * (1 - EDGE) - r, t: H * EDGE + 56 + r, b: H * (1 - EDGE) - r * 0.7 };
     }
-    function stepBits(dt) { // the lumps fly out, bounce, and shrink away
+    function stepBits(dt) { // drops stretch as they fly, then land as puddles that spread and soak away
       for (var i = 0; i < head.bits.length; i++) {
         var b = head.bits[i];
         if (!b.mesh.visible) continue;
         b.age += dt;
-        b.vel.y -= 30 * dt;
-        b.mesh.position.addScaledVector(b.vel, dt);
-        if (b.mesh.position.y < b.r) {
-          b.mesh.position.y = b.r;
-          b.vel.y = Math.abs(b.vel.y) * 0.42;
-          b.vel.x *= 0.75;
-          b.vel.z *= 0.75;
+        if (!b.down) {
+          b.vel.y -= 30 * dt;
+          b.mesh.position.addScaledVector(b.vel, dt);
+          var sp = b.vel.length(), k = 1 + Math.min(1.6, sp * 0.09); // long and thin along its path, like a drip
+          if (sp > 0.01) b.mesh.quaternion.setFromUnitVectors(head.ax.set(0, 1, 0), head.v3.copy(b.vel).multiplyScalar(1 / sp));
+          b.mesh.scale.set(b.r / Math.sqrt(k), b.r * k, b.r / Math.sqrt(k));
+          if (b.mesh.position.y < b.r * 0.4) { b.down = true; b.spread = 0; b.mesh.position.y = 0.03; b.mesh.quaternion.set(0, 0, 0, 1); }
+        } else {
+          b.spread = Math.min(1, b.spread + dt * 3.5);
+          var e = 1 - (1 - b.spread) * (1 - b.spread);
+          var gone = b.age < 1.5 ? 1 : Math.max(0, 1 - (b.age - 1.5) / 0.7);
+          var wide = b.r * (1 + 0.8 * e) * gone; // a soft dome of a puddle, not a flat disc
+          b.mesh.scale.set(wide, b.r * (0.6 - 0.32 * e) * gone, wide);
+          if (gone <= 0) b.mesh.visible = false;
         }
-        var k = b.age < 1.3 ? 1 : Math.max(0, 1 - (b.age - 1.3) / 0.8);
-        // squashed a little by its own speed, like the head
-        var sq = 1 + Math.min(0.5, Math.abs(b.vel.y) * 0.03);
-        b.mesh.scale.set(b.r * k / Math.sqrt(sq), b.r * k * sq, b.r * k / Math.sqrt(sq));
-        if (k <= 0) b.mesh.visible = false;
       }
     }
     function local(e) {
@@ -1022,13 +1026,18 @@
       head.rest = 1;
       head.vel.set(head.vel.x * 0.15, 6.5, head.vel.z * 0.15); // the skull only hops, so the eye can stay on it
       head.bits.forEach(function (b, i) {
-        var a = (i / head.bits.length) * 6.283 + Math.random() * 0.4, up = 3 + Math.random() * 8, out = 3 + Math.random() * 6;
-        b.r = 0.14 + Math.random() * 0.26;
+        var a = (i / head.bits.length) * 6.283 + Math.random() * 0.6, up = 1 + Math.random() * 7, out = 1.5 + Math.random() * 5;
+        b.r = 0.12 + Math.random() * Math.random() * 0.5; // mostly small drops, a few big ones
         b.age = 0;
+        b.down = false;
         b.mesh.position.copy(head.pos);
         b.mesh.position.x += Math.cos(a) * 0.5;
         b.mesh.position.z += Math.sin(a) * 0.5;
         b.vel.set(Math.cos(a) * out, up, Math.sin(a) * out);
+        if (i < 3) { // the bulk of it slumps straight down into a pool under the skull
+          b.r = 0.6 - i * 0.12;
+          b.vel.set(Math.cos(a) * 0.8, -2, Math.sin(a) * 0.8);
+        }
         b.mesh.visible = true;
       });
       head.proj.copy(head.pos).project(head.camera);
@@ -1039,7 +1048,10 @@
           trail.push({ x: pop.x + Math.cos(ta) * pop.r, y: pop.y + Math.sin(ta) * pop.r, vx: Math.cos(ta) * 700, vy: Math.sin(ta) * 250, life: 0.4 });
         }
       }
-      burstTimer = setTimeout(function () { setSkull(false); }, 2600); // long enough to see the skull land and sit
+      burstTimer = setTimeout(function () { // once the puddles have soaked away, the screen glitches back to the figure
+        glitchScreen(44);
+        setSkull(false);
+      }, 2500);
     }
     if (dayBtn) dayBtn.addEventListener("click", function () { setSkull(!day); });
     window.addEventListener("resize", function () { size(); fitHead(); });
@@ -1094,10 +1106,10 @@
           var pk2 = pop.t / 0.45;
           if (pk2 >= 1) pop = null;
           else {
-            bctx.strokeStyle = "rgba(255,177,208," + (1 - pk2).toFixed(3) + ")";
+            bctx.strokeStyle = "rgba(199,156,196," + (1 - pk2).toFixed(3) + ")";
             bctx.lineWidth = 10 * (1 - pk2) + 1;
             bctx.beginPath();
-            bctx.arc(pop.x, pop.y, pop.r * (0.8 + pk2 * 2.2), 0, 6.2832);
+            bctx.arc(pop.x, pop.y, pop.r * (0.7 + pk2 * 0.9), 0, 6.2832);
             bctx.stroke();
           }
         }
@@ -1338,7 +1350,7 @@
     function fit() {
       if (view.hidden) return;
       var w = list.clientWidth, h = list.clientHeight;
-      var size = Math.max(26, Math.min(w * (w < 600 ? 0.085 : 0.044), 62));
+      var size = Math.max(26, Math.min(w * (w < 600 ? 0.085 : 0.031), 44));
       lineH = size * 1.22;
       // the staircase runs roughly from the top-left corner towards the bottom-right one
       step = Math.max(size * 1.12, lineH * (w / h) * 0.72); // never steeper than about 47 degrees
