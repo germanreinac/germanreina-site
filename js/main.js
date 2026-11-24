@@ -562,14 +562,6 @@
       function inv(c) { return Math.max(0, Math.min(255, Math.round((((c / 255) / b - 0.5) / k + 0.5) * 255))); }
       return (underC = "rgb(" + inv(bg[0]) + "," + inv(bg[1]) + "," + inv(bg[2]) + ")");
     }
-    // The clip was rendered on a backdrop darker than the page. Anything in it darker than the page
-    // colour is raised to that colour, so the backdrop disappears into the page and nothing is pitch black.
-    function lift(c2d, x, y, w, h) {
-      c2d.globalCompositeOperation = "lighten";
-      c2d.fillStyle = underColour();
-      c2d.fillRect(x, y, w, h);
-      c2d.globalCompositeOperation = "source-over";
-    }
     var hero = document.getElementById("hero");
     hero.addEventListener("pointermove", poke);
     hero.addEventListener("pointerdown", function (e) { lastPt = null; poke(e); });
@@ -606,8 +598,8 @@
     var wakeX = 0, wakeY = 0; // where the head last tore the floor
     var nightT = 9;      // seconds since the figure came back
     var THREE_SRC = "js/vendor/three.min.js";
-    var BG = 0x211e2a;           // the page colour in this mode; the skull fades into it with distance
-    var FAR = -26;               // how far back it may go
+    var BG = 0x1f1f21;           // the page colour in this mode; the skull fades into it with distance
+    var FAR = -64;               // how far back it may go: past the top of a wide screen, and to the horizon on a tall one
     var REST = 0.95;             // height of its centre when it sits on the floor (its radius is about 1)
     var BURST_HI = 4.4, BURST_LO = 0.15; // stretched or squashed past these, it bursts
     function loadThree(done) {
@@ -628,7 +620,7 @@
       renderer.domElement.className = "hero__gl";
       stage.appendChild(renderer.domElement);
       var scene = new THREE.Scene();
-      scene.fog = new THREE.Fog(BG, 17, 46);
+      scene.fog = new THREE.Fog(BG, 18, 92);
       scene.add(new THREE.AmbientLight(0xffffff, 0.5));
       var sun = new THREE.DirectionalLight(0xffffff, 0.5);
       sun.position.set(-0.6, 1.6, 1.2);
@@ -691,7 +683,7 @@
       );
       shadow.rotation.x = -Math.PI / 2;
       scene.add(shadow);
-      var grid = new THREE.GridHelper(160, 64, 0x3a3647, 0x302c3b); // a faint floor, so depth reads
+      var grid = new THREE.GridHelper(240, 96, 0x38383b, 0x2d2d30); // a faint floor, so depth reads
       grid.position.y = -0.01;
       scene.add(grid);
       return {
@@ -719,8 +711,10 @@
       head.camera.fov = tall ? 52 : 34;
       // high enough that the floor runs from the bottom edge of the screen to well up it, and close
       // enough that the head on the floor is about as big as the figure's own head
-      head.camera.position.set(0, tall ? 7 : 6, tall ? 11 : 10.5);
-      head.camera.lookAt(0, 0.4, tall ? -2.5 : -1.5);
+      // On a wide screen the camera looks further out, so the floor runs all the way back to a horizon
+      // just under the top of the screen and the head can be taken there.
+      head.camera.position.set(0, tall ? 7 : 5.5, 11);
+      if (tall) head.camera.lookAt(0, 0.4, -2.5); else head.camera.lookAt(0, 1.93, -3);
       head.camera.updateProjectionMatrix();
       head.camera.updateMatrixWorld();
     }
@@ -1215,7 +1209,6 @@
           var fade = 1 - dayT / 0.8;
           fade = fade * fade * (3 - 2 * fade);
           g0.drawImage(frame, cx - (fw * fs) / 2, fy - (fh * fs) / 2, fw * fs, fh * fs);
-          lift(g0, cx - (fw * fs) / 2, fy - (fh * fs) / 2, fw * fs, fh * fs);
           // soft-edged, so it dissolves instead of leaving a hard shape
           var mrx = fh * fs * 0.3, mry = fh * fs * 0.46;
           g0.globalCompositeOperation = "destination-in";
@@ -1259,7 +1252,6 @@
         var back = Math.min(1, nightT / 0.8);
         back = back * back * (3 - 2 * back); // fades in when coming back from head mode (applied by the mask at the end)
         g0.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
-        lift(g0, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
       }
       if (layered) {
         bctx.fillStyle = underColour();
@@ -1519,7 +1511,7 @@
         var depth = Math.cos(th), y = R * Math.sin(th);
         var x = y * slope + (1 - depth) * R * 0.38; // the far side of the rim sits off to the right, so the wheel reads as a ring
         if (gapK >= 0 && k !== gapK && gap > 0) { // the names before and after slide apart along the diagonal, leaving room for the thumbnail
-          var push = (wrap((k - gapK) * STEP) > 0 ? 1 : -1) * spread * gap;
+          var push = (wrap((k - gapK) * STEP) > 0 ? spread + lineH * 0.75 + 14 : -spread) * gap; // the ones below also clear the caption
           y += push;
           x += push * slope * 0.6;
         }
@@ -1528,7 +1520,7 @@
           (depth > 0 ? " rotateX(" + (-th * 0.5).toFixed(3) + "rad)" : "");
         var op = depth > 0 ? 0.16 + 0.84 * depth * depth : 0.07 + 0.09 * (1 + depth);
         var blur = depth > 0 ? (1 - depth) * 3.5 : 3.5 + -depth * 2.5;
-        if (gapK >= 0 && k !== gapK) { op *= 1 - 0.6 * gap; blur += gap; }
+        if (gapK >= 0 && k !== gapK) { op *= 1 - 0.3 * gap; blur += gap * 0.5; }
         if (k === active) { op = opened ? 0 : 1; blur = 0; } // the name has become its preview
         n.style.opacity = op.toFixed(3);
         var b = Math.round(blur * 2) / 2;
@@ -1687,11 +1679,11 @@
       list.style.fontSize = size + "px";
       list.style.perspective = Math.round(R * 4.2) + "px";
       list.style.perspectiveOrigin = ax + "px " + ay + "px";
-      spread = frame.offsetWidth * 0.3125 + lineH * 0.45; // half the thumbnail's height, and a little air
+      spread = Math.max(0, frame.offsetWidth * 0.3125 - lineH * 0.3); // the name before ends up just above the thumbnail, the name after just below its caption
       layout();
       kick();
     }
-    footer(document.getElementById("play-foot"), false);
+    footer(document.getElementById("play-foot"), true);
     window.__playShown = fit;
     window.addEventListener("resize", fit);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
@@ -1876,7 +1868,7 @@
   wireIndex();
   (location.hash === "#play-flat" ? buildPlayFlat : buildPlayWheel)();
   wireSwitch();
-  document.querySelectorAll(".modes__btn, .index__title, .walk__intro h1").forEach(glitch); // titles and the switch only
+  document.querySelectorAll(".modes__btn, .chip, .index__title, .walk__intro h1").forEach(glitch); // titles and the switch only
   buildAbout();
   setMode();
   window.addEventListener("hashchange", setMode);
