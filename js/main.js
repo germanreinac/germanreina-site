@@ -1442,6 +1442,7 @@
     // Opening is one movement on one clock: the wheel turns the chosen name to the middle, the
     // neighbours part, and the name grows into its thumbnail, all eased together.
     var OPEN = 520, CLOSE = 300, tw = null, grow = null;
+    var IDLE = 0.05, idleK = 0, idleDir = 1, idleAt = 0; // radians a second: about one name every three and a half seconds
     function ease(u) { return 1 - Math.pow(1 - u, 3); }
     function place(e) { // the frame, somewhere between the word it started as and its full size
       if (!grow) return;
@@ -1469,10 +1470,14 @@
           if (Math.abs(rotTo - rot) < 0.0004) rot = rotTo;
         }
       }
+      // Left alone, the wheel keeps turning very slowly, the way it was last spun. A finger on it, or an open preview, holds it still.
+      var still = !tw && !vel && rot === rotTo && active < 0 && downY === null && now > idleAt;
+      idleK = still ? idleK + (1 - idleK) * Math.min(1, dt * 1.5) : 0;
+      if (still) { rot += idleDir * IDLE * idleK * dt; rotTo = rot; }
       spinning = vel !== 0 || rot !== rotTo;
       layout();
       if (!spinning && hoverK >= 0 && active < 0) setActive(hoverK);
-      if (spinning || tw) requestAnimationFrame(tick);
+      if (spinning || tw || !view.hidden) requestAnimationFrame(tick);
       else running = false;
     }
     function kick() {
@@ -1493,6 +1498,7 @@
         opened = false;
         go.removeAttribute("href");
         tw = { t0: pickedAt, d: CLOSE, g0: gap, g1: 0 };
+        idleAt = pickedAt + 900;
         kick();
         return;
       }
@@ -1527,6 +1533,10 @@
       kick();
     }
     // With a mouse the preview stays while the pointer rests near where it was picked, or on the thumbnail.
+    // A press may open a site only if that site's preview was already open, and had been for a
+    // moment, when the press began. So the press that brings up a preview can never also follow the link.
+    var canOpen = false;
+    view.addEventListener("pointerdown", function () { canOpen = active >= 0 && performance.now() - pickedAt > 350; }, true);
     var pickX = 0, pickY = 0, mx = 0, my = 0;
     view.addEventListener("pointermove", function (e) { mx = e.clientX; my = e.clientY; }, true);
     function nearPick(e) { // over the picked name, the thumbnail, or the space between them
@@ -1539,7 +1549,7 @@
       if (it && it.url) window.open(it.url, "_blank", "noopener");
     }
     go.addEventListener("click", function (e) {
-      if (dragged || (lastPointer !== "mouse" && performance.now() - pickedAt < OPEN + 150)) e.preventDefault(); // not until it has opened
+      if (dragged || !canOpen) e.preventDefault();
     });
 
     for (var k = 0; k < SLOTS; k++) (function (k) {
@@ -1550,13 +1560,13 @@
       if (k >= items.length) n.tabIndex = -1; else if (!it.url) n.tabIndex = 0;
       n.addEventListener("pointerdown", function (e) { lastPointer = e.pointerType; });
       // While the wheel is still turning nothing opens; whatever is under the pointer opens once it settles.
-      n.addEventListener("pointerenter", function (e) { if (e.pointerType !== "mouse") return; hoverK = k; mx = e.clientX; my = e.clientY; if (!spinning && active < 0) setActive(k); });
+      n.addEventListener("pointerenter", function (e) { if (e.pointerType !== "mouse" || (e.clientX === mx && e.clientY === my)) return; hoverK = k; mx = e.clientX; my = e.clientY; if (!spinning && active < 0) setActive(k); }); // not when a name drifts under a resting pointer
       n.addEventListener("pointermove", function (e) { if (e.pointerType === "mouse" && !spinning && active < 0) { hoverK = k; setActive(k); } });
       n.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse" && hoverK === k) hoverK = -1; });
       n.addEventListener("click", function (e) {
         e.preventDefault();
         if (dragged) return;
-        if (lastPointer === "mouse" && active >= 0 && nearPick(e)) { openActive(); return; } // the click that follows the hover
+        if (lastPointer === "mouse" && active >= 0 && nearPick(e)) { if (canOpen) openActive(); return; } // the click that follows the hover
         setActive(k);
       });
       n.addEventListener("keydown", function (e) { if (e.key === "Enter" && active !== k) { e.preventDefault(); setActive(k); } });
@@ -1578,6 +1588,7 @@
       list.style.perspectiveOrigin = ax + "px " + ay + "px";
       spread = frame.offsetWidth * 0.3125 + lineH * 0.45; // half the thumbnail's height, and a little air
       layout();
+      kick();
     }
     footer(document.getElementById("play-foot"), false);
     window.__playShown = fit;
@@ -1587,7 +1598,10 @@
     view.addEventListener("wheel", function (e) {
       e.preventDefault();
       if (active >= 0) setActive(-1);
-      spin(rotTo + (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * 0.0016); // eases to a stop after the last notch
+      var turn = (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * 0.0016;
+      if (turn) idleDir = turn > 0 ? 1 : -1;
+      idleAt = performance.now() + 900;
+      spin(rotTo + turn); // eases to a stop after the last notch
     }, { passive: false });
     var downY = null, lastY = 0, lastMove = 0, flick = 0;
     view.addEventListener("pointerdown", function (e) {
@@ -1601,9 +1615,11 @@
       if (downY !== null && dragged) {
         // let go while still moving and it coasts; hold still first and it stays put
         vel = performance.now() - lastMove < 90 ? Math.max(-14, Math.min(14, flick)) : 0;
-        if (vel) kick();
+        if (vel) idleDir = vel > 0 ? 1 : -1;
       }
+      if (downY !== null) idleAt = performance.now() + 900;
       downY = null;
+      kick();
     }
     view.addEventListener("pointercancel", endDrag);
     window.addEventListener("pointerup", endDrag);
@@ -1632,7 +1648,7 @@
     view.addEventListener("pointerleave", function () { view.classList.remove("has-cross"); });
     view.addEventListener("click", function (e) {
       if (dragged || e.target.closest(".play__item, .play__go")) return;
-      if (lastPointer === "mouse" && active >= 0 && nearPick(e)) { openActive(); return; }
+      if (lastPointer === "mouse" && active >= 0 && nearPick(e)) { if (canOpen) openActive(); return; }
       setActive(-1);
     });
   }
