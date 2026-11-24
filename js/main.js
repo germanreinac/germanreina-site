@@ -489,13 +489,16 @@
 
     var poster = new Image();
     poster.src = heroVideo.getAttribute("poster");
-    var W = 0, H = 0, dpr = 1, last = performance.now();
+    var W = 0, H = 0, dpr = 1, last = performance.now(), dirty = true, lastKey = -2;
     // the clean frame is drawn here first, then copied to the visible canvas with the glitch applied
     var buf = document.createElement("canvas"), bctx = buf.getContext("2d");
     var tint = document.createElement("canvas"), tctx = tint.getContext("2d");
 
     function size() {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // The clip is 720p, so on a wide screen one canvas pixel per CSS pixel already shows all of it;
+      // a retina-sized canvas would be four times the work for no extra detail. The 3D head gets a bit more.
+      dpr = Math.min(window.devicePixelRatio || 1, day || canvas.clientWidth < 700 ? 1.5 : 1);
+      dirty = true;
       W = canvas.clientWidth;
       H = canvas.clientHeight;
       canvas.width = buf.width = Math.round(W * dpr);
@@ -509,7 +512,7 @@
     var REACH = 64;      // how far from the path the picture is disturbed, in px
     var PULL = 0.06;     // how far it is dragged, per px/s of pointer speed
     var LINGER = 1.9;    // seconds the wake takes to settle
-    var STEP = 10, ROW = 4, CELL = 16, MAX_POINTS = 110;
+    var STEP = 10, ROW = 5, CELL = 24, MAX_POINTS = 110;
     var gx = new Float32Array(0), gy = new Float32Array(0), ga = new Float32Array(0);
     var trail = [], lastPt = null;
     var bufR = document.createElement("canvas"), rctx = bufR.getContext("2d");
@@ -543,17 +546,17 @@
       return s - Math.floor(s);
     }
     // one copy of the frame in each fringe colour, made once per frame
-    function tinted(c2d, cv, colour) {
+    function tinted(c2d, cv, colour, x, y, w, h) { // x, y, w, h: the part of the picture to prepare, in canvas pixels
       if (cv.width !== buf.width || cv.height !== buf.height) { cv.width = buf.width; cv.height = buf.height; }
       c2d.setTransform(1, 0, 0, 1, 0, 0);
       c2d.globalCompositeOperation = "source-over";
-      c2d.clearRect(0, 0, cv.width, cv.height);
-      c2d.drawImage(buf, 0, 0);
+      c2d.clearRect(x, y, w, h);
+      c2d.drawImage(buf, x, y, w, h, x, y, w, h);
       c2d.globalCompositeOperation = "source-atop";
       c2d.fillStyle = colour;
-      c2d.fillRect(0, 0, cv.width, cv.height);
+      c2d.fillRect(x, y, w, h);
       c2d.globalCompositeOperation = "multiply";
-      c2d.drawImage(buf, 0, 0);
+      c2d.drawImage(buf, x, y, w, h, x, y, w, h);
     }
 
     /* ---- skull mode: the figure's head pops off as a jelly skull to roll, bounce, stretch and burst ---- */
@@ -579,9 +582,13 @@
     // A provisional head, and the skull inside it, built from simple shapes. Swap for the real models when exported.
     function buildHead() {
       var THREE = window.THREE, renderer;
-      try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); }
+      try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
       catch (e) { return null; }
       renderer.setClearColor(0x000000, 0);
+      // The 3D canvas is shown as it is, on top of the 2D one. It is only copied into the 2D canvas
+      // on the frames where the picture is being torn, since that copy is the slow part.
+      renderer.domElement.className = "hero__gl";
+      stage.appendChild(renderer.domElement);
       var scene = new THREE.Scene();
       scene.fog = new THREE.Fog(BG, 17, 46);
       scene.add(new THREE.AmbientLight(0xffffff, 0.5));
@@ -978,6 +985,8 @@
       day = on;
       document.getElementById("view-gallery").classList.toggle("is-skull", day);
       document.body.classList.toggle("is-skull", day);
+      size(); // the canvas resolution depends on the mode
+      fitHead();
       burst(intro.querySelector("h1"));
       if (dayBtn) {
         dayBtn.setAttribute("aria-pressed", String(day));
@@ -1049,7 +1058,7 @@
         }
       }
       burstTimer = setTimeout(function () { // once the puddles have soaked away, the screen glitches back to the figure
-        glitchScreen(44);
+        glitchScreen(16);
         setSkull(false);
       }, 2500);
     }
@@ -1064,6 +1073,14 @@
       if (canvas.clientWidth !== W || canvas.clientHeight !== H) { size(); fitHead(); }
       var frame = heroVideo.readyState >= 2 ? heroVideo : (poster.complete && poster.naturalWidth ? poster : null);
       var src = day ? null : frame;
+      var torn = trail.length > 0;
+      if (!day && !torn && nightT > 0.9 && src) { // idle home screen: the video only has a new frame 30 times a second
+        var key = src === heroVideo ? heroVideo.currentTime : -1;
+        if (key === lastKey && !dirty) return;
+        lastKey = key;
+      } else lastKey = -2;
+      dirty = false;
+      var g0 = torn ? bctx : ctx; // the clean frame goes straight to the screen unless it has to be torn first
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, W, H);
@@ -1071,46 +1088,50 @@
 
       // 1. the clean frame
       var sw = 1, sh = 1, scale = 1, cx = W * 0.5, cy = H * 0.5;
-      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      bctx.globalAlpha = 1;
-      bctx.clearRect(0, 0, W, H);
+      if (torn) {
+        bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        bctx.globalAlpha = 1;
+        bctx.clearRect(0, 0, W, H);
+      }
       if (day) {
         dayT += dt;
         if (frame && dayT < 0.8) { // the body fades away after the head leaves it
           var fw = frame.videoWidth || frame.naturalWidth, fh = frame.videoHeight || frame.naturalHeight;
           var ftall = W / H < 0.8, fs = Math.max(W / fw, H / fh) * (ftall ? 0.74 : 1), fy = H * (ftall ? 0.56 : 0.5);
           var fade = 1 - dayT / 0.8;
-          bctx.globalAlpha = fade * fade * (3 - 2 * fade);
-          bctx.drawImage(frame, cx - (fw * fs) / 2, fy - (fh * fs) / 2, fw * fs, fh * fs);
-          bctx.globalAlpha = 1;
+          g0.globalAlpha = fade * fade * (3 - 2 * fade);
+          g0.drawImage(frame, cx - (fw * fs) / 2, fy - (fh * fs) / 2, fw * fs, fh * fs);
+          g0.globalAlpha = 1;
           // soft-edged, so it dissolves instead of leaving a hard shape
           var mrx = fh * fs * 0.3, mry = fh * fs * 0.46;
-          bctx.globalCompositeOperation = "destination-in";
-          bctx.save();
-          bctx.translate(cx, fy);
-          bctx.scale(mrx / mry, 1);
-          var mg = bctx.createRadialGradient(0, 0, mry * 0.3, 0, 0, mry);
+          g0.globalCompositeOperation = "destination-in";
+          g0.save();
+          g0.translate(cx, fy);
+          g0.scale(mrx / mry, 1);
+          var mg = g0.createRadialGradient(0, 0, mry * 0.3, 0, 0, mry);
           mg.addColorStop(0, "rgba(0,0,0,1)");
           mg.addColorStop(1, "rgba(0,0,0,0)");
-          bctx.fillStyle = mg;
-          bctx.fillRect(-mry * 4, -mry * 4, mry * 8, mry * 8);
-          bctx.restore();
-          bctx.globalCompositeOperation = "source-over";
+          g0.fillStyle = mg;
+          g0.fillRect(-mry * 4, -mry * 4, mry * 8, mry * 8);
+          g0.restore();
+          g0.globalCompositeOperation = "source-over";
         }
         if (head) {
           stepHead(dt);
-          if (day) bctx.drawImage(head.renderer.domElement, 0, 0, W, H);
+          var glEl = head.renderer.domElement;
+          if (torn && day) { g0.drawImage(glEl, 0, 0, W, H); glEl.style.visibility = "hidden"; }
+          else { glEl.style.visibility = "visible"; glEl.style.opacity = "1"; }
         }
         if (pop) { // a ring opening out from where it burst
           pop.t += dt;
           var pk2 = pop.t / 0.45;
           if (pk2 >= 1) pop = null;
           else {
-            bctx.strokeStyle = "rgba(199,156,196," + (1 - pk2).toFixed(3) + ")";
-            bctx.lineWidth = 10 * (1 - pk2) + 1;
-            bctx.beginPath();
-            bctx.arc(pop.x, pop.y, pop.r * (0.7 + pk2 * 0.9), 0, 6.2832);
-            bctx.stroke();
+            g0.strokeStyle = "rgba(199,156,196," + (1 - pk2).toFixed(3) + ")";
+            g0.lineWidth = 10 * (1 - pk2) + 1;
+            g0.beginPath();
+            g0.arc(pop.x, pop.y, pop.r * (0.7 + pk2 * 0.9), 0, 6.2832);
+            g0.stroke();
           }
         }
       } else {
@@ -1122,11 +1143,11 @@
         cy = H * (tall ? 0.56 : 0.5);
         nightT += dt;
         var back = Math.min(1, nightT / 0.8);
-        bctx.globalAlpha = back * back * (3 - 2 * back); // fades in when coming back from head mode
-        bctx.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
-        bctx.globalAlpha = 1;
+        g0.globalAlpha = back * back * (3 - 2 * back); // fades in when coming back from head mode
+        g0.drawImage(src, cx - (sw * scale) / 2, cy - (sh * scale) / 2, sw * scale, sh * scale);
+        g0.globalAlpha = 1;
       }
-      ctx.drawImage(buf, 0, 0, W, H);
+      if (torn) ctx.drawImage(buf, 0, 0, W, H);
 
       // 2. the wake. Every live point on the path adds its pull to a coarse grid of cells, so
       //    overlapping points build up instead of overwriting each other.
@@ -1164,8 +1185,10 @@
           if (rb > r1) r1 = rb;
         }
         if (c1 >= c0) {
-          tinted(rctx, bufR, "#ff0000");
-          tinted(cctx, bufC, "#00ffff");
+          var tx = Math.max(0, Math.floor((c0 * CELL - 130) * dpr)), ty = Math.max(0, Math.floor((r0 * ROW - 40) * dpr));
+          var tw = Math.min(buf.width, Math.ceil(((c1 + 1) * CELL + 130) * dpr)) - tx, th = Math.min(buf.height, Math.ceil(((r1 + 1) * ROW + 40) * dpr)) - ty;
+          tinted(rctx, bufR, "#ff0000", tx, ty, tw, th);
+          tinted(cctx, bufC, "#00ffff", tx, ty, tw, th);
           var tick = Math.floor(now / 80);
           for (var r = r0; r <= r1; r++) {
             var n1 = noise(r, tick), tear = n1 > 0.88 ? 2.4 : 1;   // now and then a whole row jumps further
@@ -1206,10 +1229,9 @@
       ctx.globalCompositeOperation = "source-over";
       if (head && nightT < 0.6) { // what was left of head mode fades out over the returning figure
         stepHead(dt);
-        ctx.globalAlpha = 1 - nightT / 0.6;
-        ctx.drawImage(head.renderer.domElement, 0, 0, W, H);
-        ctx.globalAlpha = 1;
-      }
+        head.renderer.domElement.style.visibility = "visible";
+        head.renderer.domElement.style.opacity = (1 - nightT / 0.6).toFixed(2);
+      } else if (head) head.renderer.domElement.style.visibility = "hidden";
     }
     requestAnimationFrame(draw);
 

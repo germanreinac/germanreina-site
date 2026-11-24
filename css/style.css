@@ -679,6 +679,7 @@ main { flex: 1; min-height: 0; position: relative; }
 .gallery.is-skull .walltext h1, .gallery.is-skull .walltext p { filter: blur(2.2px); opacity: 0.6; }
 .gallery.is-skull .hero .walk__intro h1 { pointer-events: none; }
 .hero__canvas { transition: filter 0.8s ease; }
+.hero__gl { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .gallery.is-skull .hero__canvas { filter: contrast(1) brightness(1) saturate(1); cursor: grab; }
 .gallery.is-skull .hero.is-holding .hero__canvas { cursor: grabbing; }
 .gallery.is-skull .hero__stage { transform: none !important; }
@@ -911,7 +912,7 @@ main { flex: 1; min-height: 0; position: relative; }
   left: 0;
   top: 0;
   z-index: 0; /* behind the list, so the rows stay readable over it */
-  width: min(31vw, 26.5rem);
+  width: min(58vw, 54rem, 120vh);
   aspect-ratio: 16 / 10;
   display: flex;
   align-items: flex-end;
