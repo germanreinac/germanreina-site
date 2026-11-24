@@ -86,7 +86,7 @@ button { font: inherit; color: inherit; }
 }
 .modes { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
 .modes.is-dragging, .modes.is-dragging .modes__btn { cursor: grabbing; }
-.modes__btn { position: relative; z-index: 1; transition: color 0.2s ease; -webkit-tap-highlight-color: transparent; }
+.modes__btn { position: relative; z-index: 1; white-space: nowrap; transition: color 0.2s ease; -webkit-tap-highlight-color: transparent; }
 .modes__btn.is-under { color: var(--paper); }
 .modes__thumb { /* the pill that slides along the track; it overshoots a touch and settles */
   position: absolute;

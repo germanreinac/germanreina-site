@@ -1,6 +1,26 @@
 (function () {
   var site = window.SITE;
   var projects = window.PROJECTS;
+  // Which page is showing. Links between pages are handled here rather than left to the browser, so
+  // that nothing ever navigates away or opens a tab; the address is updated where the browser allows it.
+  var route = location.hash;
+  function go(hash) {
+    if (hash.charAt(0) !== "#") hash = "#" + hash;
+    if (hash === route) return;
+    route = hash;
+    try { history.pushState(null, "", hash); } catch (e) {}
+    setMode();
+    window.dispatchEvent(new Event("route"));
+  }
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (!a || e.defaultPrevented) return;
+    e.preventDefault();
+    go(a.getAttribute("href"));
+  });
+  function onAddress() { if (location.hash === route) return; route = location.hash; setMode(); window.dispatchEvent(new Event("route")); }
+  window.addEventListener("hashchange", onAddress);
+  window.addEventListener("popstate", onAddress);
   var bySlug = {};
   projects.forEach(function (p) { bySlug[p.slug] = p; });
 
@@ -247,12 +267,12 @@
     });
     table.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") peek.classList.remove("is-on"); });
     table.addEventListener("click", function () { peek.classList.remove("is-on"); });
-    window.addEventListener("hashchange", function () { peek.classList.remove("is-on"); });
+    window.addEventListener("route", function () { peek.classList.remove("is-on"); });
     document.querySelectorAll(".view.index").forEach(function (v) { // the bottom blur lifts once you reach the end
       function atEnd() { v.classList.toggle("is-end", v.clientHeight > 0 && v.scrollTop + v.clientHeight >= v.scrollHeight - 90); }
       v.addEventListener("scroll", atEnd, { passive: true });
       window.addEventListener("resize", atEnd);
-      window.addEventListener("hashchange", function () { setTimeout(atEnd, 0); });
+      window.addEventListener("route", function () { setTimeout(atEnd, 0); });
       atEnd();
       setTimeout(atEnd, 80); // again once the page has laid out, in case it opened on this view
     });
@@ -321,7 +341,7 @@
     island: "drag to spin the pages · click one to open it · click the artist"
   };
   function setMode() {
-    var name = location.hash.slice(1);
+    var name = route.slice(1);
     var about = document.getElementById("view-about");
     var playView = document.getElementById("view-play");
     var mode = name === "index" ? "index" : (name === "about" && about ? "about" : ((name === "play" || name === "play-flat") && playView ? "play" : "gallery"));
@@ -483,8 +503,8 @@
     nameLink.setAttribute("role", "link");
     nameLink.tabIndex = 0;
     nameLink.title = "About";
-    nameLink.addEventListener("click", function () { location.hash = "about"; });
-    nameLink.addEventListener("keydown", function (e) { if (e.key === "Enter") location.hash = "about"; });
+    nameLink.addEventListener("click", function () { go("about"); });
+    nameLink.addEventListener("keydown", function (e) { if (e.key === "Enter") go("about"); });
     if (site.nameHint) { // a small line above the name, saying it can be clicked
       var hintLink = el("a", "walk__tip", site.nameHint);
       hintLink.href = "#about";
@@ -1433,7 +1453,7 @@
       modes.classList.remove("is-pressed", "is-dragging");
       if (!was) return;
       setTimeout(function () { moved = false; }, 60); // long enough to swallow the click that ends the drag
-      if (near !== current()) location.hash = near.getAttribute("href");
+      if (near !== current()) go(near.getAttribute("href"));
       else switchRest();
     }
     window.addEventListener("pointerup", drop);
@@ -1884,6 +1904,6 @@
   document.querySelectorAll(".modes__btn, .chip, .index__title, .walk__intro h1").forEach(glitch); // titles and the switch only
   buildAbout();
   setMode();
-  window.addEventListener("hashchange", setMode);
+
   requestFog();
 })();
