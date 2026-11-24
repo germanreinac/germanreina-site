@@ -45,9 +45,17 @@ window.SITE = {
   play: [
     { domain: "artdiscipline.com", url: "https://artdiscipline.com", note: "Newsletter site", image: "images/play/artdiscipline.jpg", tone: "#2b2631" },
     { domain: "colorpoop.com", url: "http://www.colorpoop.com", note: "Colorpoop", image: "", tone: "#b9a2e6" },
-    { domain: "megalith interactive", url: "", note: "Stand-in entry: send the domain", image: "", tone: "#7fa7a0" },
-    { domain: "sketchpoop", url: "", note: "Stand-in entry: send the domain", image: "", tone: "#f08fa8" },
-    { domain: "matrioska", url: "", note: "Stand-in entry: send the domain", image: "", tone: "#6f8fd6" }
+    // Everything below is a stand-in so the staircase is long enough to scroll. Replace with real sites.
+    { domain: "megalith interactive", url: "", note: "Stand-in", image: "", tone: "#7fa7a0" },
+    { domain: "sketchpoop", url: "", note: "Stand-in", image: "", tone: "#f08fa8" },
+    { domain: "matrioska", url: "", note: "Stand-in", image: "", tone: "#6f8fd6" },
+    { domain: "canarias en venta", url: "", note: "Stand-in", image: "", tone: "#e8705f" },
+    { domain: "spiral staircase", url: "", note: "Stand-in", image: "", tone: "#c9c4bb" },
+    { domain: "shopping carts", url: "", note: "Stand-in", image: "", tone: "#8fbf6a" },
+    { domain: "tower climber", url: "", note: "Stand-in", image: "", tone: "#e3cf5a" },
+    { domain: "halloween hunter", url: "", note: "Stand-in", image: "", tone: "#d99a6c" },
+    { domain: "fractal refs", url: "", note: "Stand-in", image: "", tone: "#74c2c9" },
+    { domain: "psd coloring tool", url: "", note: "Stand-in", image: "", tone: "#e6a6c8" }
   ],
 
   about: {

@@ -470,9 +470,10 @@
     var bufC = document.createElement("canvas"), cctx = bufC.getContext("2d");
     function poke(e) {
       if (reduceMotion) return;
+      if (day && (held || bursting)) return; // no tearing while the head is in your hand, so you can see it
       var r = canvas.getBoundingClientRect();
       var x = e.clientX - r.left, y = e.clientY - r.top, t = performance.now();
-      if (!lastPt || t - lastPt.t > 250) { lastPt = { x: x, y: y, t: t }; trail.push({ x: x, y: y, vx: 0, vy: 0, life: 1 }); return; }
+      if (!lastPt || t - lastPt.t > 250) { lastPt = { x: x, y: y, t: t }; trail.push({ x: x, y: y, vx: 0, vy: 0, life: day ? 0.45 : 1 }); return; }
       var dx = x - lastPt.x, dy = y - lastPt.y, d = Math.hypot(dx, dy);
       if (d < STEP) return;
       var dtp = Math.max(8, t - lastPt.t) / 1000;
@@ -480,7 +481,7 @@
       // fill the gap since the last event, so a fast flick still leaves an unbroken wake
       var n = Math.min(12, Math.floor(d / STEP));
       for (var k = 1; k <= n; k++) {
-        trail.push({ x: lastPt.x + (dx * k) / n, y: lastPt.y + (dy * k) / n, vx: vx, vy: vy, life: 1 });
+        trail.push({ x: lastPt.x + (dx * k) / n, y: lastPt.y + (dy * k) / n, vx: vx, vy: vy, life: day ? 0.45 : 1 }); // a shorter, fainter wake in head mode
       }
       if (trail.length > MAX_POINTS) trail.splice(0, trail.length - MAX_POINTS);
       lastPt = { x: x, y: y, t: t };
@@ -511,12 +512,12 @@
 
     /* ---- skull mode: the figure's head pops off as a jelly skull to roll, bounce, stretch and burst ---- */
     var day = false, dayT = 9, head = null, held = false, grabAt = null, downAt = null;
-    var touches = {}, pinch = null, wheelAt = 0;
+    var touches = {}, pinch = null, wheelAt = 0, bursting = false, burstTimer = 0;
     var THREE_SRC = "js/vendor/three.min.js";
     var BG = 0x131118;           // the page colour in this mode; the skull fades into it with distance
     var FAR = -26;               // how far back it may go
-    var REST = 1.02;             // height of its centre when it sits on the floor (its radius is about 1)
-    var BURST_HI = 2.3, BURST_LO = 0.36; // stretched or squashed past these, it bursts
+    var REST = 0.95;             // height of its centre when it sits on the floor (its radius is about 1)
+    var BURST_HI = 4.4, BURST_LO = 0.15; // stretched or squashed past these, it bursts
     function loadThree(done) {
       if (window.THREE) { done(); return; }
       var s = document.createElement("script");
@@ -524,7 +525,7 @@
       s.onload = done;
       document.head.appendChild(s);
     }
-    // A provisional skull built from simple shapes. Swap this for the real model when it is exported.
+    // A provisional head, and the skull inside it, built from simple shapes. Swap for the real models when exported.
     function buildHead() {
       var THREE = window.THREE, renderer;
       try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); }
@@ -548,22 +549,34 @@
         b.scale.set(sx || 1, sy || 1, sz || 1);
         return b;
       }
-      var g = new THREE.Group();
-      g.add(ball(bone, 1, 0, 0.12, 0, 1.06, 0.94, 1));                         // cranium
-      g.add(ball(bone, 0.62, 0, -0.58, 0.3, 1.02, 0.68, 0.86));                 // jaw
-      g.add(ball(bone, 0.3, -0.98, 0.1, -0.05, 0.6, 0.8, 0.6));                 // stubs where the ears were
-      g.add(ball(bone, 0.3, 0.98, 0.1, -0.05, 0.6, 0.8, 0.6));
-      g.add(ball(hole, 0.31, -0.4, 0.08, 0.82, 1, 1.08, 0.5));                  // eye sockets
-      g.add(ball(hole, 0.31, 0.4, 0.08, 0.82, 1, 1.08, 0.5));
-      var pupil = new THREE.MeshBasicMaterial({ color: 0xffe45e, fog: false });
-      g.add(ball(pupil, 0.07, -0.4, 0.08, 0.9));                                // the yellow eyes are still in there
-      g.add(ball(pupil, 0.07, 0.4, 0.08, 0.9));
-      g.add(ball(hole, 0.1, 0, -0.26, 0.97, 0.9, 1.3, 0.5));                    // nose
-      for (var t = -2; t <= 2; t++) {                                           // teeth
-        var tooth = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.2, 0.1), bone);
-        tooth.position.set(t * 0.165, -0.7, 0.78 - Math.abs(t) * 0.035);
-        g.add(tooth);
+      // the head you play with: glossy, like jelly
+      function jelly(c) { return new THREE.MeshPhongMaterial({ color: c, shininess: 110, specular: 0x777777 }); }
+      var pink = jelly(0xffb1d0), green = jelly(0x8fd9b6), yellow = jelly(0xffe45e), mouth = jelly(0xb9a2e6);
+      var face = new THREE.Group();
+      face.add(ball(pink, 1, 0, 0, 0, 1.06, 0.88, 0.96));                         // skull
+      face.add(ball(pink, 0.5, -1.08, 0.04, 0, 0.8, 1, 0.62));                    // ears
+      face.add(ball(pink, 0.5, 1.08, 0.04, 0, 0.8, 1, 0.62));
+      face.add(ball(green, 0.42, 0.02, 0.84, 0.22, 1.35, 0.62, 1));               // tuft
+      face.add(ball(green, 0.3, -0.36, 0.8, 0.3, 1.2, 0.7, 1));
+      face.add(ball(green, 0.26, 0.42, 0.9, 0.16, 1.2, 0.7, 1));
+      face.add(ball(yellow, 0.095, -0.42, 0.12, 0.88));                           // eyes
+      face.add(ball(yellow, 0.095, 0.42, 0.12, 0.88));
+      face.add(ball(mouth, 1, 0, -0.3, 0.8, 0.5, 0.19, 0.2));                     // mouth
+      // the skull that is left when the head bursts
+      var skull = new THREE.Group();
+      skull.add(ball(bone, 0.86, 0, 0.1, 0, 1.06, 0.94, 1));                      // cranium
+      skull.add(ball(bone, 0.54, 0, -0.5, 0.26, 1.02, 0.68, 0.86));               // jaw
+      skull.add(ball(hole, 0.27, -0.35, 0.07, 0.7, 1, 1.08, 0.5));                // eye sockets
+      skull.add(ball(hole, 0.27, 0.35, 0.07, 0.7, 1, 1.08, 0.5));
+      skull.add(ball(hole, 0.09, 0, -0.22, 0.83, 0.9, 1.3, 0.5));                 // nose
+      for (var t = -2; t <= 2; t++) {                                             // teeth
+        var tooth = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.17, 0.09), bone);
+        tooth.position.set(t * 0.14, -0.6, 0.67 - Math.abs(t) * 0.03);
+        skull.add(tooth);
       }
+      skull.visible = false;
+      var g = new THREE.Group();
+      g.add(face, skull);
       var outer = new THREE.Group(); // carries position and the jelly squash; the inner group carries the rolling
       outer.add(g);
       scene.add(outer);
@@ -577,7 +590,7 @@
       grid.position.y = -0.01;
       scene.add(grid);
       return {
-        renderer: renderer, scene: scene, camera: camera, group: g, outer: outer, shadow: shadow,
+        renderer: renderer, scene: scene, camera: camera, group: g, face: face, skull: skull, outer: outer, shadow: shadow,
         pos: new THREE.Vector3(0, REST, 0), vel: new THREE.Vector3(), w: new THREE.Vector3(),
         q: new THREE.Quaternion(), tmp: new THREE.Quaternion(), ax: new THREE.Vector3(),
         ray: new THREE.Raycaster(), ndc: new THREE.Vector2(), hit: new THREE.Vector3(), proj: new THREE.Vector3(),
@@ -593,10 +606,11 @@
       head.renderer.setPixelRatio(dpr);
       head.renderer.setSize(W, H, false);
       head.camera.aspect = W / H;
-      head.camera.fov = tall ? 52 : 32;
-      // high enough that the floor runs from the bottom edge of the screen to well up it
-      head.camera.position.set(0, tall ? 9.5 : 7.5, tall ? 15 : 14.5);
-      head.camera.lookAt(0, 0, tall ? -3.5 : -1.5);
+      head.camera.fov = tall ? 52 : 34;
+      // high enough that the floor runs from the bottom edge of the screen to well up it, and close
+      // enough that the head on the floor is about as big as the figure's own head
+      head.camera.position.set(0, tall ? 7 : 6, tall ? 11 : 10.5);
+      head.camera.lookAt(0, 0.4, tall ? -2.5 : -1.5);
       head.camera.updateProjectionMatrix();
       head.camera.updateMatrixWorld();
     }
@@ -609,16 +623,20 @@
     function figureHead() {
       var sw = heroVideo.videoWidth || 1280, sh = heroVideo.videoHeight || 720, tall = W / H < 0.8;
       var scale = Math.max(W / sw, H / sh) * (tall ? 0.74 : 1);
-      return { x: W * 0.5, y: H * (tall ? 0.56 : 0.5) - sh * scale * 0.17 };
+      return { x: W * 0.5, y: H * (tall ? 0.56 : 0.5) - sh * scale * 0.17, r: sh * scale * 0.15 };
     }
     function dropHead() {
       if (!head) return;
       // it pops off the body: starts where the figure's head is, jumps, and falls to the floor
       var at = figureHead(), r = aim(at.x, at.y);
-      var t = -r.origin.z / r.direction.z;
+      // far enough along that line of sight to look the same size as the figure's head
+      var t = (H / 2) / Math.tan((head.camera.fov * Math.PI) / 360) / at.r * 1.06;
       head.pos.copy(r.direction).multiplyScalar(t).add(r.origin);
       if (head.pos.y < REST) head.pos.y = REST;
-      head.vel.set((Math.random() - 0.5) * 4, 8, 0.8);
+      head.vel.set((Math.random() - 0.5) * 3, 6.5, -1.2);
+      head.face.visible = true;
+      head.skull.visible = false;
+      bursting = false;
       head.w.set(5, 0, (Math.random() - 0.5) * 7);
       head.q.set(0, 0, 0, 1);
       head.s = 1.25;
@@ -673,7 +691,7 @@
         if (head.proj.x > 0.88 && v.x > 0) { v.x = -v.x * 0.7; head.sv += 3; }
         if (head.proj.y < -0.8 && v.z > 0) { v.z = -v.z * 0.7; head.sv += 3; }
       }
-      var s = Math.max(0.2, head.s), side = 1 / Math.sqrt(s);
+      var s = Math.max(0.1, head.s), side = 1 / Math.sqrt(s);
       head.outer.position.copy(p);
       head.outer.scale.set(side * head.wide, s / Math.sqrt(head.wide), side);
       head.group.quaternion.copy(head.q);
@@ -683,7 +701,7 @@
       head.shadow.material.opacity = 0.5 / (1 + lift * 0.7);
       head.renderer.render(head.scene, head.camera);
       // pushed too far out of shape, it bursts
-      if (head.s > BURST_HI || head.s < BURST_LO || head.wide > BURST_HI) burstHead();
+      if (!bursting && (head.s > BURST_HI || head.s < BURST_LO || head.wide > BURST_HI)) burstHead();
     }
     function local(e) {
       var r = canvas.getBoundingClientRect();
@@ -691,7 +709,7 @@
     }
     function onSkull(pt) { return aim(pt.x, pt.y).distanceToPoint(head.pos) < 1.5; }
     hero.addEventListener("pointerdown", function (e) {
-      if (!day || !head || !head.outer.visible) return;
+      if (!day || !head || bursting) return;
       var pt = local(e);
       touches[e.pointerId] = pt;
       var ids = Object.keys(touches);
@@ -747,10 +765,10 @@
     hero.addEventListener("pointercancel", letGo);
     // with a mouse there is no second finger: the wheel stretches it while the pointer is on it
     hero.addEventListener("wheel", function (e) {
-      if (!day || !head || !head.outer.visible) return;
+      if (!day || !head || bursting) return;
       if (!onSkull(local(e))) return;
       e.preventDefault();
-      head.rest = Math.max(0.25, Math.min(2.6, head.rest * Math.exp(-e.deltaY * 0.0016)));
+      head.rest = Math.max(0.1, Math.min(4.8, head.rest * Math.exp(-e.deltaY * 0.0011)));
       wheelAt = performance.now();
     }, { passive: false });
 
@@ -787,6 +805,8 @@
       held = false;
       pinch = null;
       touches = {};
+      clearTimeout(burstTimer);
+      bursting = false;
       if (day) {
         heroVideo.pause();
         dayT = 0;
@@ -799,19 +819,33 @@
         if (pl && pl.catch) pl.catch(function () {});
       }
     }
-    function burstHead() { // it pops, the screen tears, and the whole figure is back
-      if (!day) return;
-      if (!reduceMotion && head) {
+    function burstHead() { // the jelly pops, the skull drops out of it, and then the whole figure is back
+      if (!day || bursting) return;
+      bursting = true;
+      held = false;
+      pinch = null;
+      touches = {};
+      hero.classList.remove("is-holding");
+      head.face.visible = false;
+      head.skull.visible = true;
+      head.s = 1.5;
+      head.sv = 0;
+      head.wide = 1;
+      head.rest = 1;
+      head.vel.set((Math.random() - 0.5) * 6, 9, (Math.random() - 0.5) * 3);
+      if (!reduceMotion) {
         head.proj.copy(head.pos).project(head.camera);
         var bx = (head.proj.x + 1) / 2 * W, by = (1 - head.proj.y) / 2 * H;
-        for (var i = 0; i < 40; i++) { // a ring of tears flying out from where it was
-          var a = (i / 40) * 6.283;
-          trail.push({ x: bx + Math.cos(a) * 60, y: by + Math.sin(a) * 60, vx: Math.cos(a) * 1400, vy: Math.sin(a) * 1400, life: 0.6 + Math.random() * 0.4 });
+        for (var i = 0; i < 46; i++) { // a ring of tears flying out from where it was
+          var a = (i / 46) * 6.283;
+          trail.push({ x: bx + Math.cos(a) * 70, y: by + Math.sin(a) * 70, vx: Math.cos(a) * 1500, vy: Math.sin(a) * 1500, life: 0.7 + Math.random() * 0.4 });
         }
       }
-      if (head) head.outer.visible = head.shadow.visible = false;
-      glitchScreen(50);
-      setSkull(false);
+      glitchScreen(30);
+      burstTimer = setTimeout(function () { // long enough to see the skull land
+        glitchScreen(50);
+        setSkull(false);
+      }, 1500);
     }
     if (dayBtn) dayBtn.addEventListener("click", function () {
       glitchScreen(34);
@@ -859,7 +893,7 @@
           bctx.restore();
           bctx.globalCompositeOperation = "source-over";
         }
-        if (head && head.outer.visible) {
+        if (head) {
           stepHead(dt);
           if (day) bctx.drawImage(head.renderer.domElement, 0, 0, W, H);
         }
@@ -1018,70 +1052,96 @@
     indexNote.appendChild(document.createTextNode(" for now."));
   }
 
-  /* Play: the interactive sites, in the same light style as the Index. The names step down
-     and to the right like a staircase. Pointing at one (or tapping it) nudges the others
-     apart so it reads clearly, and shows a framed preview of the site. */
+  /* Play: the interactive sites, in the same light style as the Index. The names run down a long
+     diagonal staircase that crosses the screen and carries on past its edges; scrolling slides the
+     whole staircase along that diagonal. Clicking a name picks it: the others fly apart along the
+     diagonal, and a moment later a preview opens behind it. Clicking it again opens the site. */
   function buildPlay() {
     var view = document.getElementById("view-play"), items = site.play;
     if (!view || !items) return;
     var list = document.getElementById("play-list"), frame = document.getElementById("play-frame");
     var shot = document.getElementById("play-shot"), cap = document.getElementById("play-cap");
-    var nodes = [], active = -1;
-    var touch = window.matchMedia("(pointer: coarse)").matches;
+    var nodes = [], active = -1, off = -1, lineH = 60, step = 100, showT = 0;
+    var PREVIEW_DELAY = 550; // ms between the names flying apart and the preview opening
 
+    function place() { // slide the staircase so the name at "off" sits at the left, a little above the middle
+      var h = list.clientHeight, w = list.clientWidth;
+      var x = w * 0.07 - (off / lineH) * step, y = h * 0.4 - lineH / 2 - off;
+      list.style.transform = "translate(" + x.toFixed(1) + "px," + y.toFixed(1) + "px)";
+    }
+    function scrollTo(v) {
+      off = Math.max(0, Math.min((nodes.length - 1) * lineH, v));
+      place();
+    }
     function setActive(i) {
       if (i === active) return;
       active = i;
+      clearTimeout(showT);
+      frame.classList.remove("is-in");
       nodes.forEach(function (n, k) {
         n.classList.toggle("is-active", k === i);
-        // like a magnet turned the wrong way round: everything else jumps away from the chosen name
+        // everything before the chosen name flies up and left, everything after it down and right
         n.style.setProperty("--push", i < 0 || k === i ? "0" : (k < i ? "-1" : "1"));
       });
       view.classList.toggle("has-active", i >= 0);
       if (i < 0) return;
       var it = items[i];
-      shot.style.backgroundColor = it.tone || "";
-      shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
-      cap.textContent = it.note + (it.url ? "" : " · not live yet");
-      frame.classList.remove("is-in");
-      void frame.offsetWidth;
-      frame.classList.add("is-in");
+      scrollTo(i * lineH); // bring it to the middle
       burst(nodes[i]);
+      showT = setTimeout(function () { // the preview waits for the names to finish moving
+        shot.style.backgroundColor = it.tone || "";
+        shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
+        cap.textContent = it.note + (it.url ? " · click again to open" : " · not live yet");
+        void frame.offsetWidth;
+        frame.classList.add("is-in");
+      }, reduceMotion ? 0 : PREVIEW_DELAY);
     }
+    var dragged = false;
     items.forEach(function (it, i) {
       var n = it.url ? outLink("", it.url, "play__item") : el("span", "play__item play__item--soon");
       n.textContent = it.domain;
       n.style.setProperty("--i", i);
+      if (!it.url) n.tabIndex = 0;
       glitch(n);
-      n.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse") setActive(i); });
-      n.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") setActive(-1); });
-      n.addEventListener("focus", function () { setActive(i); });
-      n.addEventListener("blur", function () { if (!touch) setActive(-1); });
-      n.addEventListener("click", function (e) { // on touch the first tap picks it, the second opens it
-        if (touch && active !== i) { e.preventDefault(); setActive(i); }
+      n.addEventListener("click", function (e) { // the first click only picks it; the second opens it
+        if (dragged) { e.preventDefault(); return; }
+        if (active !== i) { e.preventDefault(); setActive(i); }
       });
+      n.addEventListener("keydown", function (e) { if (e.key === "Enter" && active !== i) { e.preventDefault(); setActive(i); } });
       list.appendChild(n);
       nodes.push(n);
     });
 
-    // Size the type and the steps so the staircase runs from one side of the screen to the other.
-    // The step is as big as the last name allows; a long name in the middle is pulled back just enough to fit.
     function fit() {
       if (view.hidden) return;
-      var w = list.clientWidth, h = list.clientHeight, n = nodes.length;
-      var size = Math.max(22, Math.min(w * (w < 600 ? 0.085 : 0.07), h / (n * 1.22 + 2.6), 104));
+      var w = list.clientWidth, h = list.clientHeight;
+      var size = Math.max(26, Math.min(w * (w < 600 ? 0.085 : 0.066), 96));
+      lineH = size * 1.22;
+      // the staircase runs roughly from the top-left corner towards the bottom-right one
+      step = Math.max(size * 0.9, lineH * (w / h) * 0.72);
       list.style.fontSize = size + "px";
-      var widest = 0;
-      nodes.forEach(function (node) { node.style.marginLeft = "0"; widest = Math.max(widest, node.offsetWidth); });
-      if (widest > w) { size *= w / widest; list.style.fontSize = size + "px"; }
-      var step = n > 1 ? Math.max(0, (w - nodes[n - 1].offsetWidth) / (n - 1)) : 0;
-      nodes.forEach(function (node, k) { node.style.marginLeft = Math.max(0, Math.min(k * step, w - node.offsetWidth)) + "px"; });
+      list.style.setProperty("--step", step + "px");
+      list.style.setProperty("--line", lineH + "px");
+      if (off < 0) off = 0;
+      scrollTo(active >= 0 ? active * lineH : off);
     }
     window.__playShown = fit;
     window.addEventListener("resize", fit);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 
+    view.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      if (active >= 0) setActive(-1);
+      scrollTo(off + (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * 0.6);
+    }, { passive: false });
+    var downY = null, lastY = 0;
+    view.addEventListener("pointerdown", function (e) { downY = lastY = e.clientY; dragged = false; });
     view.addEventListener("pointermove", function (e) {
+      if (downY !== null && e.pointerType !== "mouse") { // drag up and down to slide the staircase
+        if (Math.abs(e.clientY - downY) > 8 && !dragged) { dragged = true; if (active >= 0) setActive(-1); }
+        if (dragged) scrollTo(off - (e.clientY - lastY));
+        lastY = e.clientY;
+      }
       if (e.pointerType !== "mouse") return;
       // cross-hair that spans the screen
       var r = view.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
@@ -1092,9 +1152,29 @@
       xy.textContent = "x " + ("000" + Math.round(x)).slice(-4) + "  y " + ("000" + Math.round(y)).slice(-4);
       xy.style.transform = "translate(" + (x + 12) + "px," + (y + 10) + "px)";
     });
+    window.addEventListener("pointerup", function () { downY = null; });
     view.addEventListener("pointerleave", function () { view.classList.remove("has-cross"); });
-    view.addEventListener("click", function (e) { if (touch && !e.target.closest(".play__item")) setActive(-1); });
+    view.addEventListener("click", function (e) { if (!dragged && !e.target.closest(".play__item")) setActive(-1); });
   }
+
+  /* On a touch screen, a sideways swipe moves to the next or previous view, like sliding the switch. */
+  (function () {
+    var sx = null, sy = 0, st = 0;
+    window.addEventListener("touchstart", function (e) {
+      if (e.touches.length !== 1) { sx = null; return; }
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now();
+    }, { passive: true });
+    window.addEventListener("touchend", function (e) {
+      if (sx === null) return;
+      var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+      sx = null;
+      if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - st > 700) return;
+      if (sheet.open || document.querySelector(".gallery.is-skull")) return; // not while a sheet is open or the head is out
+      var order = Array.prototype.map.call(document.querySelectorAll(".modes__btn"), function (b) { return b.dataset.mode; });
+      var next = order[order.indexOf(document.body.dataset.mode) + (dx < 0 ? 1 : -1)];
+      if (next) location.hash = next;
+    }, { passive: true });
+  })();
 
   buildIndex("all");
   wireIndex();

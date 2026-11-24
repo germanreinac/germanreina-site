@@ -4,14 +4,14 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 ## The site (`index.html`)
 
-Three views, switched from the bar at the top (Gallery, Index, Play):
+Three views, switched from the bar at the top (Gallery, Index, Play), or by swiping left and right on a phone:
 
 - **Gallery** (`#gallery`): the home page. Your name and the line under it beside the looping Ra video from the current site, centred. The picture is dragged and torn along the path of the pointer or finger, with split colours, leaving a wake that takes a couple of seconds to settle. Titles and links across the site play the same glitch, briefly, when the pointer reaches them. This stands in for the interactive gallery until its art is made.
 - **Index** (`#index`): a plain list of projects with filters. Each row opens a sheet with the facts; images are on ArtStation for now.
 
-- **Play** (`#play`): the interactive sites and games, in the same light style as the Index. The names step down and to the right like a staircase. Pointing at one (or tapping it) pushes the others away from it and shows a preview of the site in the middle of the screen, behind the names. Entries are the `play` list in `js/projects.js`; previews go in `images/play/`.
+- **Play** (`#play`): the interactive sites and games, in the same light style as the Index. The names run down a long diagonal staircase that carries on past the screen; scrolling slides it along that diagonal. Clicking a name picks it: the others fly apart along the diagonal and, half a second later, a preview opens behind it. Clicking it again opens the site. Entries are the `play` list in `js/projects.js`; previews go in `images/play/`.
 
-The home page has a Behead button (bottom left). The figure's head pops off as a jelly skull and falls to a floor seen from above, on a slightly darker background with the name out of focus. Drag it anywhere on screen to roll it, let go to throw it, tap it to make it jump; it fades into fog as it goes back. Stretch it with two fingers (or the mouse wheel while pointing at it): pulled too far, or slammed too hard, it bursts in a glitch and the whole figure returns. The skull is a provisional one built from simple shapes in `buildHead()` in `js/main.js`, to be replaced by the real model.
+The home page has a Behead button (bottom left). The figure's head pops off as a jelly head and falls to a floor seen from above, on a slightly darker background with the name softened. Drag it anywhere on screen to roll it, let go to throw it, tap it to make it jump; it fades into fog as it goes back. Stretch it with two fingers (or the mouse wheel while pointing at it): pulled much too far, it bursts, the skull drops out, and after a glitch the whole figure returns. Head and skull are provisional ones built from simple shapes in `buildHead()` in `js/main.js`, to be replaced by the real models.
 
 There is no About page for now. Its content (bio, contact, links, experience, talks) is still in `js/projects.js` under `about`, and `js/main.js` still knows how to build it if an About view is added back to `index.html`.
 
