@@ -1288,7 +1288,7 @@
     var list = document.getElementById("play-list"), frame = document.getElementById("play-frame");
     var shot = document.getElementById("play-shot"), cap = document.getElementById("play-cap");
     var nodes = [], active = -1, off = -1, lineH = 60, step = 100, showT = 0;
-    var PREVIEW_DELAY = 550; // ms between the names flying apart and the preview opening
+    var PREVIEW_DELAY = 300; // ms between the names moving apart and the preview opening, after a tap
     var pickedAt = 0, lastPointer = "mouse";
     var hoverable = window.matchMedia("(hover: hover) and (pointer: fine)").matches; // a mouse: point to preview, click to open
 
@@ -1322,12 +1322,13 @@
         cap.textContent = it.note + (it.url ? (hoverable ? " · click to open" : " · tap again to open") : " · not live yet");
         void frame.offsetWidth;
         frame.classList.add("is-in");
-      }, reduceMotion ? 0 : PREVIEW_DELAY);
+      }, reduceMotion ? 0 : (recentre ? PREVIEW_DELAY : 90)); // under a mouse it opens almost at once
     }
     var dragged = false;
     items.forEach(function (it, i) {
       var n = it.url ? outLink("", it.url, "play__item") : el("span", "play__item play__item--soon");
       n.textContent = it.domain;
+      if (it.image) { var pre = new Image(); pre.src = it.image; } // loaded ahead, so the preview never waits on the network
       n.style.setProperty("--i", i);
       if (!it.url) n.tabIndex = 0;
       n.addEventListener("pointerdown", function (e) { lastPointer = e.pointerType; });
