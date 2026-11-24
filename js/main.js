@@ -1312,15 +1312,15 @@
     if (!view || !items) return;
     view.classList.add("is-wheel");
     var list = document.getElementById("play-list"), frame = document.getElementById("play-frame");
-    var shot = document.getElementById("play-shot"), cap = document.getElementById("play-cap"), tag = document.getElementById("play-tag");
+    var shot = document.getElementById("play-shot"), cap = document.getElementById("play-cap"), go = document.getElementById("play-go");
     var SLOTS = Math.ceil(30 / items.length) * items.length;  // the list repeats until the rim is full
     var STEP = (Math.PI * 2) / SLOTS, GAP = 0.2;              // GAP: how far neighbours part around a chosen name
     var nodes = [], active = -1, opened = false, rot = 0, rotTo = 0, spinning = false;
     var vel = 0;                       // spin left over after a flick, in radians a second
     var gap = 0, gapTo = 0, gapK = -1; // how far the neighbours have parted, and around which name
-    var running = false, lastT = 0, seqT = 0, spread = 150;
-    var R = 300, lineH = 50, slope = 1, ax = 200, ay = 300, showT = 0, pickedAt = 0, lastPointer = "mouse", dragged = false;
-    var PREVIEW_DELAY = 300, hoverK = -1;
+    var running = false, lastT = 0, spread = 150;
+    var R = 300, lineH = 50, slope = 1, ax = 200, ay = 300, pickedAt = 0, lastPointer = "mouse", dragged = false;
+    var hoverK = -1;
     var hoverable = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
     function wrap(a) { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; }
@@ -1340,81 +1340,116 @@
         var op = depth > 0 ? 0.16 + 0.84 * depth * depth : 0.07 + 0.09 * (1 + depth);
         var blur = depth > 0 ? (1 - depth) * 3.5 : 3.5 + -depth * 2.5;
         if (gapK >= 0 && k !== gapK) { op *= 1 - 0.6 * gap; blur += gap; }
-        if (k === active) { op = opened ? 0 : 1; blur = 0; } // once the preview is open, the name lives in its corner
+        if (k === active) { op = opened ? 0 : 1; blur = 0; } // the name has become its preview
         n.style.opacity = op.toFixed(3);
         var b = Math.round(blur * 2) / 2;
         if (n._blur !== b) { n._blur = b; n.style.filter = b ? "blur(" + b + "px)" : "none"; }
         n.style.zIndex = String(200 + Math.round(depth * 100));
-        n.style.pointerEvents = depth > 0.5 ? "auto" : "none";
+        n.style.pointerEvents = depth > 0.5 && k !== active ? "auto" : "none";
       }
+    }
+    // Opening is one movement on one clock: the wheel turns the chosen name to the middle, the
+    // neighbours part, and the name grows into its thumbnail, all eased together.
+    var OPEN = 520, CLOSE = 300, tw = null, grow = null;
+    function ease(u) { return 1 - Math.pow(1 - u, 3); }
+    function place(e) { // the frame, somewhere between the word it started as and its full size
+      if (!grow) return;
+      frame.style.transform = "translate(" + (grow.dx * (1 - e)).toFixed(1) + "px," + (grow.dy * (1 - e)).toFixed(1) + "px) scale(" +
+        (grow.sx + (1 - grow.sx) * e).toFixed(4) + "," + (grow.sy + (1 - grow.sy) * e).toFixed(4) + ")";
     }
     function tick(now) {
       var dt = Math.min(0.05, (now - lastT) / 1000);
       lastT = now;
-      if (vel) { // coasting after a flick: it slows down by itself, like a wheel with a little friction
-        rot += vel * dt;
-        rotTo = rot;
-        vel *= Math.exp(-dt * 2.6);
-        if (Math.abs(vel) < 0.04) vel = 0;
-      } else if (rot !== rotTo) {
-        rot += (rotTo - rot) * Math.min(1, dt * 11);
-        if (Math.abs(rotTo - rot) < 0.0004) rot = rotTo;
+      if (tw) {
+        var u = Math.min(1, (now - tw.t0) / tw.d), e = ease(u);
+        gap = tw.g0 + (tw.g1 - tw.g0) * e;
+        if (tw.turn) { rot = tw.r0 + (tw.r1 - tw.r0) * e; if (u === 1) rot = rotTo = tw.r1; }
+        if (tw.open) place(e);
+        if (u === 1) { gap = tw.g1; tw = null; }
       }
-      if (gap !== gapTo) { // the neighbours part, or close up again, over about a third of a second
-        gap += (gapTo - gap) * Math.min(1, dt * 10);
-        if (Math.abs(gapTo - gap) < 0.004) gap = gapTo;
+      if (!(tw && tw.turn)) {
+        if (vel) { // coasting after a flick: it slows down by itself, like a wheel with a little friction
+          rot += vel * dt;
+          rotTo = rot;
+          vel *= Math.exp(-dt * 2.6);
+          if (Math.abs(vel) < 0.04) vel = 0;
+        } else if (rot !== rotTo) {
+          rot += (rotTo - rot) * Math.min(1, dt * 11);
+          if (Math.abs(rotTo - rot) < 0.0004) rot = rotTo;
+        }
       }
       spinning = vel !== 0 || rot !== rotTo;
       layout();
-      if (!spinning && hoverK >= 0 && active < 0) setActive(hoverK, false);
-      if (spinning || gap !== gapTo) requestAnimationFrame(tick);
+      if (!spinning && hoverK >= 0 && active < 0) setActive(hoverK);
+      if (spinning || tw) requestAnimationFrame(tick);
       else running = false;
     }
     function kick() {
-      if (reduceMotion) { rot = rotTo; gap = gapTo; vel = 0; spinning = false; layout(); return; }
+      if (reduceMotion) {
+        if (tw) { gap = tw.g1; if (tw.turn) rotTo = tw.r1; if (tw.open) place(1); tw = null; }
+        rot = rotTo; vel = 0; spinning = false; layout(); return;
+      }
       if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(tick); }
     }
     function spin(to) { vel = 0; rotTo = to; spinning = rot !== rotTo; kick(); }
-    // Picking a name plays in clear steps: (a tap first turns the wheel to bring it to the front,)
-    // the neighbours part, then the name shrinks into a small label as its preview unfolds from it.
-    var TURN = 380, PART = 300;
-    function setActive(k, recentre) {
+    function setActive(k) {
       if (k === active) return;
       active = k;
-      opened = false;
       pickedAt = performance.now();
-      clearTimeout(showT);
-      clearTimeout(seqT);
       frame.classList.remove("is-in");
       view.classList.toggle("has-active", k >= 0);
-      if (k < 0) { gapTo = 0; kick(); return; }
-      var it = items[k % items.length], turn = recentre && !reduceMotion ? TURN : 0;
+      if (k < 0) { // close: the thumbnail fades and the neighbours come back together
+        opened = false;
+        go.removeAttribute("href");
+        tw = { t0: pickedAt, d: CLOSE, g0: gap, g1: 0 };
+        kick();
+        return;
+      }
+      var it = items[k % items.length];
       gapK = k;
-      if (recentre) spin(rot + wrap(k * STEP - rot));
-      seqT = setTimeout(function () { gapTo = 1; kick(); }, turn);
-      showT = setTimeout(function () {
-        shot.style.backgroundColor = it.tone || "";
-        shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
-        cap.textContent = it.domain + " · " + it.note + (it.url ? (hoverable ? " · click to open" : " · tap again to open") : " · not live yet");
-        // The name itself becomes the thumbnail: the frame starts as a bar exactly the size of the
-        // word, in its place on the wheel, and grows from there into the gap the others have left.
-        var r = nodes[k].getBoundingClientRect(), vr = view.getBoundingClientRect();
-        var fw = frame.offsetWidth, fh = shot.offsetHeight;
-        var nx = r.left - vr.left, cy = r.top - vr.top + r.height / 2;
-        var left = Math.max(12, Math.min(vr.width - fw - 12, nx)), top = Math.max(70, Math.min(vr.height - fh - 44, cy - fh / 2));
-        frame.style.left = left + "px";
-        frame.style.top = top + "px";
-        frame.style.transformOrigin = Math.max(0, nx - left) + "px " + (cy - top) + "px";
-        frame.style.transition = "none";
-        frame.style.transform = "scale(" + (r.width / fw).toFixed(4) + "," + (r.height * 0.62 / fh).toFixed(4) + ")";
-        void frame.offsetWidth;
-        frame.style.transition = "";
-        frame.classList.add("is-in");
-        frame.style.transform = "scale(1)";
-        opened = true;
-        layout();
-      }, reduceMotion ? 0 : turn + PART);
+      vel = 0;
+      pickX = mx;
+      pickY = my;
+      shot.style.backgroundColor = it.tone || "";
+      shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
+      cap.textContent = it.domain + " · " + it.note + (it.url ? (hoverable ? " · click to open" : " · tap to open") : " · not live yet");
+      if (it.url) go.href = it.url; else go.removeAttribute("href");
+      // The frame starts as a bar exactly the size of the word, where the word is now, and ends
+      // full size where the word is headed: the front of the wheel, in the middle of the view.
+      var r = nodes[k].getBoundingClientRect(), vr = view.getBoundingClientRect(), lr = list.getBoundingClientRect();
+      var fw = frame.offsetWidth, fh = shot.offsetHeight;
+      var left = Math.max(12, Math.min(vr.width - fw - 12, (vr.width - fw) / 2));
+      var top = Math.max(70, Math.min(vr.height - fh - 44, lr.top - vr.top + ay - fh / 2));
+      var bh = r.height * 0.62;
+      grow = { dx: r.left - vr.left - left, dy: r.top - vr.top + (r.height - bh) / 2 - top, sx: r.width / fw, sy: bh / fh,
+        zone: { left: Math.min(r.left, vr.left + left), top: Math.min(r.top, vr.top + top), right: Math.max(r.right, vr.left + left + fw), bottom: Math.max(r.bottom, vr.top + top + fh) } };
+      frame.style.left = left + "px";
+      frame.style.top = top + "px";
+      place(0);
+      void frame.offsetWidth;
+      frame.classList.add("is-in");
+      opened = true;
+      var to = rot + wrap(k * STEP - rot);
+      rotTo = to;
+      tw = { t0: pickedAt, d: OPEN, g0: gap, g1: 1, turn: true, r0: rot, r1: to, open: true };
+      spinning = true;
+      kick();
     }
+    // With a mouse the preview stays while the pointer rests near where it was picked, or on the thumbnail.
+    var pickX = 0, pickY = 0, mx = 0, my = 0;
+    view.addEventListener("pointermove", function (e) { mx = e.clientX; my = e.clientY; }, true);
+    function nearPick(e) { // over the picked name, the thumbnail, or the space between them
+      var z = grow && grow.zone, pad = 36;
+      return !!z && e.clientX > Math.min(pickX, z.left) - pad && e.clientX < Math.max(pickX, z.right) + pad &&
+        e.clientY > Math.min(pickY, z.top) - pad && e.clientY < Math.max(pickY, z.bottom) + pad;
+    }
+    function openActive() {
+      var it = active >= 0 ? items[active % items.length] : null;
+      if (it && it.url) window.open(it.url, "_blank", "noopener");
+    }
+    go.addEventListener("click", function (e) {
+      if (dragged || (lastPointer !== "mouse" && performance.now() - pickedAt < OPEN + 150)) e.preventDefault(); // not until it has opened
+    });
 
     for (var k = 0; k < SLOTS; k++) (function (k) {
       var it = items[k % items.length];
@@ -1424,16 +1459,16 @@
       if (k >= items.length) n.tabIndex = -1; else if (!it.url) n.tabIndex = 0;
       n.addEventListener("pointerdown", function (e) { lastPointer = e.pointerType; });
       // While the wheel is still turning nothing opens; whatever is under the pointer opens once it settles.
-      n.addEventListener("pointerenter", function (e) { if (e.pointerType !== "mouse") return; hoverK = k; if (!spinning) setActive(k, false); });
-      n.addEventListener("pointermove", function (e) { if (e.pointerType === "mouse" && !spinning && active !== k) { hoverK = k; setActive(k, false); } });
-      n.addEventListener("pointerleave", function (e) { if (e.pointerType !== "mouse") return; if (hoverK === k) hoverK = -1; if (active === k) setActive(-1); });
+      n.addEventListener("pointerenter", function (e) { if (e.pointerType !== "mouse") return; hoverK = k; mx = e.clientX; my = e.clientY; if (!spinning && active < 0) setActive(k); });
+      n.addEventListener("pointermove", function (e) { if (e.pointerType === "mouse" && !spinning && active < 0) { hoverK = k; setActive(k); } });
+      n.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse" && hoverK === k) hoverK = -1; });
       n.addEventListener("click", function (e) {
-        if (dragged) { e.preventDefault(); return; }
-        if (lastPointer === "mouse" && active === k) return;
-        if (active !== k) { e.preventDefault(); setActive(k, true); return; }
-        if (performance.now() - pickedAt < TURN + PART + 350) e.preventDefault(); // not until the preview has opened
+        e.preventDefault();
+        if (dragged) return;
+        if (lastPointer === "mouse" && active >= 0 && nearPick(e)) { openActive(); return; } // the click that follows the hover
+        setActive(k);
       });
-      n.addEventListener("keydown", function (e) { if (e.key === "Enter" && active !== k) { e.preventDefault(); setActive(k, true); } });
+      n.addEventListener("keydown", function (e) { if (e.key === "Enter" && active !== k) { e.preventDefault(); setActive(k); } });
       list.appendChild(n);
       nodes.push(n);
     })(k);
@@ -1465,6 +1500,7 @@
     }, { passive: false });
     var downY = null, lastY = 0, lastMove = 0, flick = 0;
     view.addEventListener("pointerdown", function (e) {
+      lastPointer = e.pointerType;
       downY = lastY = e.clientY;
       dragged = false;
       flick = 0;
@@ -1493,6 +1529,7 @@
         lastY = e.clientY;
       }
       if (e.pointerType !== "mouse") return;
+      if (active >= 0 && !nearPick(e)) setActive(-1);
       var r = view.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
       view.classList.add("has-cross");
       document.getElementById("cross-h").style.transform = "translateY(" + y + "px)";
@@ -1502,7 +1539,11 @@
       xy.style.transform = "translate(" + (x + 12) + "px," + (y + 10) + "px)";
     });
     view.addEventListener("pointerleave", function () { view.classList.remove("has-cross"); });
-    view.addEventListener("click", function (e) { if (!dragged && !e.target.closest(".play__item")) setActive(-1); });
+    view.addEventListener("click", function (e) {
+      if (dragged || e.target.closest(".play__item, .play__go")) return;
+      if (lastPointer === "mouse" && active >= 0 && nearPick(e)) { openActive(); return; }
+      setActive(-1);
+    });
   }
 
   /* Play as a flat staircase: the earlier version, kept at #play-flat for comparison. */

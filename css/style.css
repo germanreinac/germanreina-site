@@ -823,8 +823,12 @@ main { flex: 1; min-height: 0; position: relative; }
   left: 0;
   top: 0;
   width: min(40vw, 32rem, 70vh);
-  transition: transform 0.55s cubic-bezier(0.25, 0.9, 0.2, 1), opacity 0.12s ease;
+  transform-origin: 0 0;
+  transition: opacity 0.16s ease; /* its growth is driven frame by frame, on the same clock as the wheel */
 }
+.play__go { display: none; }
+.play.is-wheel .play__go { display: block; position: absolute; inset: 0; z-index: 1; }
+.play.is-wheel .play__frame.is-in { pointer-events: auto; }
 .play.is-wheel .play__frame.is-in .play__shot { animation: none; }
 .play.is-wheel .play__shot { position: relative; }
 .play.is-wheel .play__shot::after { /* starts as solid ink, like the word it grew from, and clears to show the site */
@@ -833,11 +837,11 @@ main { flex: 1; min-height: 0; position: relative; }
   inset: 0;
   background: var(--ink);
   opacity: 1;
-  transition: opacity 0.4s ease 0.12s;
+  transition: opacity 0.4s ease 0.1s;
 }
 .play.is-wheel .play__frame.is-in .play__shot::after { opacity: 0; }
 .play.is-wheel .play__item { transition: opacity 0.14s ease; }
-.play.is-wheel .play__frame figcaption { position: absolute; left: 0; top: 100%; right: 0; opacity: 0; transition: opacity 0.25s ease 0.35s; }
+.play.is-wheel .play__frame figcaption { position: absolute; left: 0; top: 100%; right: 0; opacity: 0; transition: opacity 0.25s ease 0.4s; }
 .play.is-wheel .play__frame.is-in figcaption { opacity: 1; }
 @media (max-width: 720px) { .play.is-wheel .play__frame { width: min(76vw, 22rem); } }
 .play__cross, .play__xy { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; opacity: 0; }
