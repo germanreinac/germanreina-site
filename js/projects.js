@@ -38,6 +38,18 @@ window.SITE = {
     { label: "Mentorship", url: "https://www.trojan-unicorn.com/village/spaces/102-guidance-sessions/mentorships/offers/773-character-design" }
   ],
 
+  // The Play page: interactive sites and games. One line each.
+  //   domain: what is shown in the list      url: where it goes ("" = not live yet)
+  //   image:  a screenshot or GIF shown behind the list on hover, e.g. "images/play/name.jpg"
+  //   tone:   background colour used until there is an image
+  play: [
+    { domain: "artdiscipline.com", url: "https://artdiscipline.com", note: "Newsletter site", image: "images/play/artdiscipline.jpg", tone: "#2b2631" },
+    { domain: "colorpoop.com", url: "http://www.colorpoop.com", note: "Colorpoop", image: "", tone: "#b9a2e6" },
+    { domain: "megalith interactive", url: "", note: "Stand-in entry: send the domain", image: "", tone: "#7fa7a0" },
+    { domain: "sketchpoop", url: "", note: "Stand-in entry: send the domain", image: "", tone: "#f08fa8" },
+    { domain: "matrioska", url: "", note: "Stand-in entry: send the domain", image: "", tone: "#6f8fd6" }
+  ],
+
   about: {
     lead: "Visual Artist and Art Director from Lanzarote.",
     text: "Creative Vision & Worldbuilding for game and animation IPs. Creator of the art and visual style for OlliOlli World (BAFTA nominated). Worked with companies like Supercell, Riot Games, Psyop, Rovio, and more.",

@@ -16,6 +16,7 @@
   <nav class="modes" aria-label="View">
     <a class="modes__btn" href="#gallery" data-mode="gallery">Gallery</a>
     <a class="modes__btn" href="#index" data-mode="index">Index</a>
+    <a class="modes__btn" href="#play" data-mode="play">Play</a>
   </nav>
   <a class="bar__out" href="https://artdiscipline.com" target="_blank" rel="noopener">Art Discipline ↗</a>
 </header>
@@ -31,6 +32,7 @@
       </div>
       <div class="walltext walk__intro" id="hero-intro"></div>
     </div>
+    <button class="daybtn" id="daybtn" type="button" aria-pressed="false"><span class="daybtn__dot" aria-hidden="true"></span><span id="daybtn-label">Day</span></button>
     <div class="room" id="room" hidden></div>
     <div class="gallery__foot">
       <span id="room-count"></span>
@@ -52,6 +54,14 @@
       <div class="table" id="table"></div>
       <footer class="index__foot" id="index-foot"></footer>
     </div>
+  </section>
+  <section class="view play" id="view-play" aria-label="Play" hidden>
+    <div class="play__preview" id="play-preview" aria-hidden="true"></div>
+    <div class="play__col"><nav class="play__list" id="play-list" aria-label="Interactive projects"></nav></div>
+    <p class="play__meta" id="play-meta"></p>
+    <div class="play__cross play__cross--h" id="cross-h" aria-hidden="true"></div>
+    <div class="play__cross play__cross--v" id="cross-v" aria-hidden="true"></div>
+    <span class="play__xy" id="cross-xy" aria-hidden="true"></span>
   </section>
 </main>
 

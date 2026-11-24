@@ -84,7 +84,7 @@ button { font: inherit; color: inherit; }
 .bar .modes { grid-column: 2; }
 .bar__out { grid-column: 3; justify-self: end; }
 /* on the home page the bar has no band of its own: the switch floats over the dark */
-body[data-mode="gallery"] .bar {
+body[data-float] .bar {
   position: absolute;
   left: 0;
   right: 0;
@@ -92,12 +92,12 @@ body[data-mode="gallery"] .bar {
   padding-block: 14px;
   background: transparent;
   border-bottom-color: transparent;
-  color: var(--star);
 }
-body[data-mode="gallery"] .modes { border-color: rgba(236, 238, 234, 0.35); background: rgba(23, 21, 29, 0.35); backdrop-filter: blur(6px); }
-body[data-mode="gallery"] .modes__btn[aria-current="page"] { background: var(--star); color: var(--ink); }
-body[data-mode="gallery"] .bar .glitch.is-glitching::after { mix-blend-mode: screen; }
-body[data-mode="gallery"] .bar :focus-visible { outline-color: var(--star); }
+body[data-dark] .bar { color: var(--star); }
+body[data-dark] .modes { border-color: rgba(236, 238, 234, 0.35); background: rgba(23, 21, 29, 0.35); backdrop-filter: blur(6px); }
+body[data-dark] .modes__btn[aria-current="page"] { background: var(--star); color: var(--ink); }
+body[data-dark] .bar .glitch.is-glitching::after { mix-blend-mode: screen; }
+body[data-dark] .bar :focus-visible { outline-color: var(--star); }
 @media (max-width: 520px) {
   .bar__out { display: none; }
 }
@@ -623,6 +623,148 @@ main { flex: 1; min-height: 0; position: relative; }
   .gallery.is-space .hero .walk__intro { top: 0; padding-top: 76px; padding-bottom: 40px; background: linear-gradient(var(--space) 40%, rgba(23, 21, 29, 0)); }
 }
 @media (prefers-reduced-motion: reduce) { .hero__stage { transition: none; } }
+
+/* ---------- day / night switch on the home page ---------- */
+.daybtn {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid rgba(236, 238, 234, 0.35);
+  border-radius: 999px;
+  background: none;
+  color: var(--star);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.daybtn__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--paper); }
+.daybtn:hover { border-color: var(--accent); color: var(--accent); }
+.daybtn:focus-visible { outline-color: var(--star); }
+.gallery.is-day .daybtn { border-color: var(--ink); color: var(--ink); }
+.gallery.is-day .daybtn__dot { background: var(--ink); }
+.gallery.is-day .daybtn:focus-visible { outline-color: var(--ink); }
+.gallery.is-space.is-day { background: var(--paper); }
+.gallery.is-space.is-day .walltext h1 { color: var(--ink); }
+.gallery.is-space.is-day .walltext p { color: var(--ink-soft); }
+.gallery.is-space.is-day .gallery__foot { color: var(--ink-soft); }
+.gallery.is-day .hero__canvas { filter: none; cursor: grab; }
+.gallery.is-day .hero.is-holding .hero__canvas { cursor: grabbing; }
+.gallery.is-day .glitch.is-glitching::after { mix-blend-mode: multiply; }
+.gallery.is-switching .hero, .gallery.is-switching .gallery__foot { animation: flip-glitch 0.5s steps(1) both; }
+@keyframes flip-glitch {
+  0% { transform: translate(-10px, 0) skewX(-4deg); filter: invert(1); clip-path: inset(0 0 62% 0); }
+  14% { transform: translate(14px, 0); filter: none; clip-path: inset(38% 0 20% 0); }
+  28% { transform: translate(-6px, 3px) skewX(3deg); filter: invert(1); clip-path: inset(70% 0 0 0); }
+  42% { transform: translate(8px, -2px); filter: none; clip-path: inset(12% 0 48% 0); }
+  58% { transform: translate(-3px, 0); filter: invert(1) hue-rotate(90deg); clip-path: none; }
+  74% { transform: translate(2px, 0); filter: none; }
+  100% { transform: none; filter: none; clip-path: none; }
+}
+@media (prefers-reduced-motion: reduce) { .gallery.is-switching .hero, .gallery.is-switching .gallery__foot { animation: none; } }
+@media (max-width: 720px) {
+  .gallery.is-space.is-day .hero .walk__intro { background: linear-gradient(var(--paper) 40%, rgba(245, 245, 241, 0)); }
+  .gallery__hint { text-align: right; }
+}
+
+/* ---------- play: a slanted column of sites ---------- */
+.play {
+  position: relative;
+  overflow: hidden;
+  background: var(--space);
+  color: var(--star);
+  cursor: crosshair;
+  touch-action: none;
+}
+.play__preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 4vw 9vh;
+  background-size: cover;
+  background-position: center top;
+  color: rgba(245, 245, 241, 0.5);
+  font-size: clamp(3rem, 13vw, 11rem);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 0.85;
+  text-align: right;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.play__preview::after { content: ""; position: absolute; inset: 0; background: rgba(23, 21, 29, 0.62); }
+.play.has-active .play__preview { opacity: 1; }
+.play__col {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 0;
+  height: 0;
+  transform: rotate(-13deg);
+}
+.play__list {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.play__item {
+  display: block;
+  padding: 0.04em 0.5em 0.04em 0.5em;
+  color: var(--star);
+  font-size: clamp(1.9rem, 6.6vw, 5.4rem);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.55s cubic-bezier(0.2, 0.75, 0.15, 1), color 0.2s, opacity 0.3s;
+}
+.play__item::before { /* the glitch uses ::before while it plays; the number sits in an attribute on the left otherwise */
+  content: attr(data-n);
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--star-soft);
+}
+.play__item.is-glitching::before { content: attr(data-text); left: 0; top: 0; font: inherit; letter-spacing: inherit; }
+.play__item.is-glitching::after { mix-blend-mode: screen; }
+.play__item--soon { color: var(--star-soft); cursor: default; }
+.play__item.is-active { color: var(--accent); }
+.play__item:focus-visible { outline-color: var(--star); }
+.play__meta {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--star-soft);
+  pointer-events: none;
+}
+.play__cross, .play__xy { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; }
+.play.has-cross .play__cross, .play.has-cross .play__xy { opacity: 1; }
+.play__cross--h { width: 100%; height: 1px; background: rgba(236, 238, 234, 0.4); }
+.play__cross--v { width: 1px; height: 100%; background: rgba(236, 238, 234, 0.4); }
+.play__xy { font-family: var(--mono); font-size: 0.66rem; color: var(--star-soft); white-space: pre; }
+@media (max-width: 720px) { .play__col { transform: rotate(-16deg); } }
+@media (prefers-reduced-motion: reduce) { .play__item, .play__list { transition: none; } }
 
 /* ---------- the four doors under the name ---------- */
 .walk__doors {

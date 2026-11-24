@@ -4,10 +4,14 @@ Personal site. Plain HTML, CSS and JS, no build step. Open `index.html` or serve
 
 ## The site (`index.html`)
 
-Two views, switched from the bar at the top:
+Three views, switched from the bar at the top (Gallery, Index, Play):
 
 - **Gallery** (`#gallery`): the home page. Your name and the line under it beside the looping Ra video from the current site, centred. The picture is dragged and torn along the path of the pointer or finger, with split colours, leaving a wake that takes a couple of seconds to settle. Titles and links across the site play the same glitch, briefly, when the pointer reaches them. This stands in for the interactive gallery until its art is made.
 - **Index** (`#index`): a plain list of projects with filters. Each row opens a sheet with the facts; images are on ArtStation for now.
+
+- **Play** (`#play`): the interactive sites and games, as a column of names crossing the screen on a slant. Scrolling slides the column; pointing at a name pushes the others away and shows that site behind it. Entries are the `play` list in `js/projects.js`; previews go in `images/play/`.
+
+The home page has a Day / Night switch (bottom left). Day turns the page off-white and drops a head you can grab, turn and throw. The head is a provisional one built from simple shapes in `buildHead()` in `js/main.js`, to be replaced by the real model.
 
 There is no About page for now. Its content (bio, contact, links, experience, talks) is still in `js/projects.js` under `about`, and `js/main.js` still knows how to build it if an About view is added back to `index.html`.
 
