@@ -1556,7 +1556,7 @@
     }
     // Opening is one movement on one clock: the wheel turns the chosen name to the middle, the
     // neighbours part, and the name grows into its thumbnail, all eased together.
-    var OPEN = 520, CLOSE = 300, tw = null, grow = null;
+    var OPEN = 520, CLOSE = 300, tw = null, grow = null, goT = 0;
     var IDLE = 0.05, idleK = 0, idleDir = 1, idleAt = 0; // radians a second: about one name every three and a half seconds
     function ease(u) { return 1 - Math.pow(1 - u, 3); }
     function place(e) { // the frame, somewhere between the word it started as and its full size
@@ -1612,6 +1612,7 @@
       if (k < 0) { // close: the thumbnail fades and the neighbours come back together
         opened = false;
         if (nowEl) nowEl.classList.remove("is-on");
+        clearTimeout(goT);
         go.removeAttribute("href");
         tw = { t0: pickedAt, d: CLOSE, g0: gap, g1: 0 };
         idleAt = pickedAt + 900;
@@ -1626,7 +1627,10 @@
       shot.style.backgroundColor = it.tone || "";
       shot.style.backgroundImage = it.image ? "url(" + it.image + ")" : "none";
       cap.textContent = it.domain + " · " + it.note + (it.url ? (hoverable ? " · click to open" : " · tap to open") : " · not live yet");
-      if (it.url) go.href = it.url; else go.removeAttribute("href");
+      // the thumbnail only becomes a link once it has been open for a moment
+      clearTimeout(goT);
+      go.removeAttribute("href");
+      if (it.url) goT = setTimeout(function () { if (active === k) go.href = it.url; }, 450);
       if (nowEl) { // the heading reads "Play <name>" while its preview is open
         nowEl.classList.remove("is-on");
         nowEl.textContent = it.domain;
@@ -1676,10 +1680,13 @@
 
     for (var k = 0; k < SLOTS; k++) (function (k) {
       var it = items[k % items.length];
-      var n = it.url ? outLink("", it.url, "play__item") : el("span", "play__item play__item--soon");
+      // The names are not links themselves. A tap on a name can then only ever bring up its preview;
+      // the site opens from the thumbnail, on a later tap, and nothing can follow a link by accident.
+      var n = el("span", "play__item" + (it.url ? "" : " play__item--soon"));
+      n.setAttribute("role", "button");
       n.textContent = it.domain;
       if (k < items.length && it.image) { var pre = new Image(); pre.src = it.image; }
-      if (k >= items.length) n.tabIndex = -1; else if (!it.url) n.tabIndex = 0;
+      n.tabIndex = k >= items.length ? -1 : 0;
       n.addEventListener("pointerdown", function (e) { lastPointer = e.pointerType; });
       // While the wheel is still turning nothing opens; whatever is under the pointer opens once it settles.
       n.addEventListener("pointerenter", function (e) { if (e.pointerType !== "mouse" || (e.clientX === mx && e.clientY === my)) return; hoverK = k; mx = e.clientX; my = e.clientY; if (!spinning && active < 0) setActive(k); }); // not when a name drifts under a resting pointer
@@ -1691,7 +1698,11 @@
         if (lastPointer === "mouse" && active >= 0 && nearPick(e)) { if (canOpen) openActive(); return; } // the click that follows the hover
         setActive(k);
       });
-      n.addEventListener("keydown", function (e) { if (e.key === "Enter" && active !== k) { e.preventDefault(); setActive(k); } });
+      n.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (active !== k) setActive(k); else if (performance.now() - pickedAt > 450) openActive();
+      });
       list.appendChild(n);
       nodes.push(n);
     })(k);
