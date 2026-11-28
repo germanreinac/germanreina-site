@@ -205,7 +205,7 @@
     room.addEventListener("click", function (e) {
       if (moved) { moved = false; e.preventDefault(); return; }
       var b = e.target.closest(".piece");
-      if (b) openSheet(b.dataset.slug);
+      if (b) openProject(b.dataset.slug);
     });
 
     room.addEventListener("keydown", function (e) {
@@ -238,7 +238,7 @@
   function wireIndex() {
     table.addEventListener("click", function (e) {
       var r = e.target.closest(".row");
-      if (r) openSheet(r.dataset.slug);
+      if (r) openProject(r.dataset.slug);
     });
     var chips = document.querySelectorAll(".chip");
     chips.forEach(function (c) {
@@ -284,6 +284,155 @@
   /* ---------- project sheet ---------- */
   var sheet = document.getElementById("sheet");
   var sheetBody = document.getElementById("sheet-body");
+
+  // A project that has a page of its own opens that; the others open the side sheet.
+  function openProject(slug) {
+    var p = bySlug[slug];
+    if (p && p.page && document.getElementById("view-project")) go("#work/" + slug);
+    else openSheet(slug);
+  }
+
+  /* ---- project page: header and facts, the finished work at a glance, then one chapter per
+     place with its finals shown and its rounds folded away under "How it got there" ---- */
+  var zoomSet = [], zoomAt = 0, builtProject = "";
+  function shot(item, cls) { // one image with its caption; a click opens it large
+    var f = el("figure", "shot" + (cls ? " " + cls : ""));
+    var b = el("button", "shot__btn");
+    b.type = "button";
+    var img = el("img");
+    img.src = item.src;
+    img.alt = item.caption || "";
+    img.loading = "lazy";
+    b.appendChild(img);
+    var at = zoomSet.length;
+    zoomSet.push(item);
+    b.addEventListener("click", function () { openZoom(at); });
+    f.appendChild(b);
+    if (item.caption) f.appendChild(el("figcaption", null, item.caption));
+    return f;
+  }
+  function buildProject(slug) {
+    var p = bySlug[slug], body = document.getElementById("project-body");
+    if (!p || !p.page || !body) return false;
+    if (builtProject === slug) return true;
+    builtProject = slug;
+    zoomSet = [];
+    body.textContent = "";
+    var pg = p.page;
+    var back = el("a", "project__back", "← Work");
+    back.href = "#index";
+    body.appendChild(back);
+    var h = el("h1", "index__title", p.title);
+    body.appendChild(h);
+    if (pg.line) body.appendChild(el("p", "project__line", pg.line));
+    var facts = el("dl", "facts");
+    (pg.facts || []).forEach(function (f) {
+      var d = el("div");
+      d.appendChild(el("dt", null, f[0]));
+      d.appendChild(el("dd", null, f[1]));
+      facts.appendChild(d);
+    });
+    body.appendChild(facts);
+    if (pg.glance && pg.glance.length) {
+      var gl = el("div", "glance");
+      pg.glance.forEach(function (it, i) { gl.appendChild(shot(it, i === 0 ? "shot--lead" : "")); });
+      body.appendChild(gl);
+    }
+    var grid = el("div", "project__grid"), nav = el("nav", "project__nav"), main = el("div", "project__main");
+    nav.setAttribute("aria-label", "Chapters");
+    var links = [];
+    (pg.chapters || []).forEach(function (ch) {
+      var sec = el("section", "chapter");
+      sec.id = "ch-" + ch.id;
+      sec.appendChild(el("h2", "chapter__title", ch.title));
+      if (ch.brief) sec.appendChild(el("p", "chapter__brief", ch.brief));
+      var fin = el("div", "chapter__finals" + (ch.finals.length > 2 ? " is-pairs" : ""));
+      ch.finals.forEach(function (it) { fin.appendChild(shot(it)); });
+      sec.appendChild(fin);
+      if (ch.process && ch.process.length) {
+        var det = el("details", "process");
+        var count = ch.process.length;
+        det.appendChild(el("summary", null, "How it got there · " + count + " steps"));
+        ch.process.forEach(function (round) {
+          var row = el("div", "round");
+          row.appendChild(el("span", "round__label", round.label));
+          var strip = el("div", "round__strip");
+          round.items.forEach(function (it) { strip.appendChild(shot(it, "shot--small")); });
+          row.appendChild(strip);
+          det.appendChild(row);
+        });
+        sec.appendChild(det);
+      }
+      main.appendChild(sec);
+      var b = el("button", "project__link", ch.title);
+      b.type = "button";
+      b.addEventListener("click", function () { sec.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" }); });
+      nav.appendChild(b);
+      links.push({ b: b, sec: sec });
+    });
+    grid.appendChild(nav);
+    grid.appendChild(main);
+    body.appendChild(grid);
+    // the chapter on screen is marked in the list
+    if (window.IntersectionObserver) {
+      var io = new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          links.forEach(function (l) { l.b.classList.toggle("is-here", l.sec === e.target); });
+        });
+      }, { root: document.getElementById("view-project"), rootMargin: "-20% 0px -65% 0px" });
+      links.forEach(function (l) { io.observe(l.sec); });
+    }
+    // the next project that has a page, if there is one
+    var withPages = projects.filter(function (q) { return q.page; }), ix = withPages.indexOf(p);
+    var foot = el("footer", "index__foot project__foot");
+    if (withPages.length > 1) {
+      var nx = withPages[(ix + 1) % withPages.length], na = el("a", null, "Next: " + nx.title + " →");
+      na.href = "#work/" + nx.slug;
+      foot.appendChild(na);
+    }
+    var all = el("a", null, "All work");
+    all.href = "#index";
+    foot.appendChild(all);
+    foot.appendChild(el("span", "credit", site.name + " © " + new Date().getFullYear()));
+    body.appendChild(foot);
+    glitch(h);
+    return true;
+  }
+  var zoom = document.getElementById("zoom");
+  function showZoom() {
+    var it = zoomSet[zoomAt];
+    if (!it) return;
+    var img = document.getElementById("zoom-img");
+    img.src = it.src;
+    img.alt = it.caption || "";
+    document.getElementById("zoom-cap").textContent = (zoomAt + 1) + " / " + zoomSet.length + (it.caption ? "  ·  " + it.caption : "");
+    zoom.classList.remove("is-actual");
+    document.getElementById("zoom-size").textContent = "Actual size";
+  }
+  function openZoom(at) {
+    if (!zoom) return;
+    zoomAt = at;
+    showZoom();
+    if (zoom.showModal) zoom.showModal(); else zoom.setAttribute("open", "");
+  }
+  function stepZoom(d) { zoomAt = (zoomAt + d + zoomSet.length) % zoomSet.length; showZoom(); }
+  function sizeZoom() {
+    var on = zoom.classList.toggle("is-actual");
+    document.getElementById("zoom-size").textContent = on ? "Fit to screen" : "Actual size";
+  }
+  if (zoom) {
+    document.getElementById("zoom-close").addEventListener("click", function () { zoom.close(); });
+    document.getElementById("zoom-prev").addEventListener("click", function () { stepZoom(-1); });
+    document.getElementById("zoom-next").addEventListener("click", function () { stepZoom(1); });
+    document.getElementById("zoom-size").addEventListener("click", sizeZoom);
+    document.getElementById("zoom-img").addEventListener("click", sizeZoom);
+    document.getElementById("zoom-stage").addEventListener("click", function (e) { if (e.target === this) zoom.close(); });
+    zoom.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowLeft") stepZoom(-1);
+      if (e.key === "ArrowRight") stepZoom(1);
+    });
+  }
 
   function openSheet(slug) {
     var p = bySlug[slug];
@@ -348,13 +497,20 @@
     var about = document.getElementById("view-about");
     var playView = document.getElementById("view-play");
     var mode = name === "index" ? "index" : (name === "about" && about ? "about" : ((name === "play" || name === "play-flat") && playView ? "play" : "gallery"));
+    var projectView = document.getElementById("view-project");
+    if (name.indexOf("work/") === 0 && projectView && buildProject(name.slice(5))) mode = "project";
+    if (projectView) {
+      var wasHidden = projectView.hidden;
+      projectView.hidden = mode !== "project";
+      if (mode === "project" && wasHidden) projectView.scrollTop = 0;
+    }
     if (about) about.hidden = mode !== "about";
     if (playView) playView.hidden = mode !== "play";
     if (mode === "gallery" && homes.ready) showHome(HOMES.indexOf(name) > 0 ? name : "gallery");
     document.getElementById("view-gallery").hidden = mode !== "gallery";
     document.getElementById("view-index").hidden = mode !== "index";
     document.querySelectorAll(".modes__btn").forEach(function (b) {
-      if (b.dataset.mode === mode) b.setAttribute("aria-current", "page");
+      if (b.dataset.mode === (mode === "project" ? "index" : mode)) b.setAttribute("aria-current", "page"); // a project page belongs to Work
       else b.removeAttribute("aria-current");
     });
     if (switchRest) switchRest();
@@ -365,6 +521,7 @@
     if (mode === "play" && window.__playShown) { window.__playShown(); burst(document.querySelector("#view-play .index__title")); }
     if (mode === "index") burst(document.querySelector("#view-index .index__title"));
     if (mode === "about") burst(document.querySelector("#view-about .index__title"));
+    if (mode === "project") burst(document.querySelector("#view-project .index__title"));
     if (heroVideo && !reduceMotion) { // only play while the home page is showing
       if (mode === "gallery") { var pl = heroVideo.play(); if (pl && pl.catch) pl.catch(function () {}); }
       else heroVideo.pause();

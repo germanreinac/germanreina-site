@@ -17,6 +17,10 @@ The home page has a Behead button (bottom left). The figure's head pops off as a
 
 Files: `index.html`, `css/style.css`, `js/main.js`, and the content in `js/projects.js`. The home video is `images/home/ra.mp4` with `images/home/ra-poster.jpg` as its still.
 
+### Project pages
+
+A project with a `page` block in `js/projects.js` opens as its own page from the Work list (address `#work/<slug>`); the others still open the side sheet. The page has a header with a row of facts, the strongest finished sheets first, then one chapter per place or subject. Each chapter shows its finals and can fold its rounds away under "How it got there". A list of chapters stays on screen, and any image opens large, fitted or at actual size. Everdale is the first one; its images and the text in square brackets are stand-ins.
+
 ### Editing content
 
 Everything is in `js/projects.js`: the line under the name, the home doors, links, the about text, experience, talks, and one block per project.

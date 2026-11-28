@@ -162,7 +162,67 @@ window.PROJECTS = [
     shape: "wide",
     tone: "#8fbf6a",
     images: [],
-    notes: ["Concept art for Supercell's Everdale, working with Zombot Studio."]
+    notes: ["Concept art for Supercell's Everdale, working with Zombot Studio."],
+    // A project with a `page` opens as its own page from the Work list instead of the side sheet.
+    //   line:     one sentence under the title
+    //   facts:    pairs shown in a row under it
+    //   glance:   the strongest finished sheets, shown first and large
+    //   chapters: one per place or subject. `finals` are shown; `process` is folded away under
+    //             "How it got there", one entry per round, each with its own images.
+    // Text in [square brackets] and every image here is a stand-in until the real ones are in.
+    page: {
+      line: "[One line: what Everdale was and what you did on it.]",
+      facts: [["Role", "Concept art"], ["Client", "Supercell, with Zombot Studio"], ["Year", "2019"], ["Scope", "[What you were responsible for]"]],
+      glance: [
+        { src: "images/placeholder/01.jpg", caption: "Capitol wonders" },
+        { src: "images/placeholder/04.jpg", caption: "Main village" },
+        { src: "images/placeholder/08.jpg", caption: "Guild woodcutter" },
+        { src: "images/placeholder/05.jpg", caption: "Campus Capitol" }
+      ],
+      chapters: [
+        { id: "main-village", title: "Main Village", brief: "[One sentence on the brief for the village.]",
+          finals: [
+            { src: "images/placeholder/04.jpg", caption: "Square, Home and Library thumbnails" },
+            { src: "images/placeholder/02.jpg", caption: "Tavern" }
+          ] },
+        { id: "campus-capitol", title: "Campus Capitol", brief: "[One sentence on the brief for the Capitol.]",
+          finals: [
+            { src: "images/placeholder/05.jpg", caption: "Change on direction, 22 Nov 2019" }
+          ],
+          process: [
+            { label: "Start", items: [{ src: "images/placeholder/01.jpg", caption: "Capitol wonders, 4 Oct 2019" }] },
+            { label: "Round 1", items: [
+              { src: "images/placeholder/03.jpg", caption: "First sketches, 10 Oct" },
+              { src: "images/placeholder/06.jpg", caption: "First sketches, 17 Oct" },
+              { src: "images/placeholder/09.jpg", caption: "Sketch boards" }] },
+            { label: "Round 2", items: [
+              { src: "images/placeholder/02.jpg", caption: "Main building, new shape" },
+              { src: "images/placeholder/07.jpg", caption: "Feedback" },
+              { src: "images/placeholder/04.jpg", caption: "Applied more in context, more complex structure" },
+              { src: "images/placeholder/08.jpg", caption: "Polished structure and materials" }] },
+            { label: "Round 3", items: [
+              { src: "images/placeholder/07.jpg", caption: "Feedback" },
+              { src: "images/placeholder/01.jpg", caption: "31 Oct" },
+              { src: "images/placeholder/10.jpg", caption: "Tower variations" },
+              { src: "images/placeholder/06.jpg", caption: "Tower variations" }] },
+            { label: "Round 4", items: [
+              { src: "images/placeholder/05.jpg", caption: "New sketches with variations" },
+              { src: "images/placeholder/03.jpg", caption: "Change on direction" }] }
+          ] },
+        { id: "guilds", title: "Guilds", brief: "[One sentence on the brief for the guild buildings.]",
+          finals: [
+            { src: "images/placeholder/08.jpg", caption: "Guild woodcutter" },
+            { src: "images/placeholder/09.jpg", caption: "Guild buildings thumbnails" }
+          ] },
+        { id: "support", title: "Support and resource buildings", brief: "[One sentence on these.]",
+          finals: [
+            { src: "images/placeholder/02.jpg", caption: "Saw Mill and Wood Storage" },
+            { src: "images/placeholder/04.jpg", caption: "Stone Storage, Clay Pit, House of Potions" },
+            { src: "images/placeholder/01.jpg", caption: "Stone pit" },
+            { src: "images/placeholder/05.jpg", caption: "Pumpkin patch" }
+          ] }
+      ]
+    }
   },
   {
     slug: "yuga-labs",

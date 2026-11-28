@@ -83,6 +83,9 @@
       <footer class="index__foot about__foot" id="about-foot"></footer>
     </div>
   </section>
+  <section class="view index project" id="view-project" aria-label="Project" hidden>
+    <div class="index__wrap" id="project-body"></div>
+  </section>
   <section class="view play" id="view-play" aria-label="Play" hidden>
     <div class="play__head">
       <h1 class="index__title">Play <span class="play__now" id="play-now" aria-live="polite"></span></h1>
@@ -100,6 +103,16 @@
   </section>
 </main>
 
+<dialog class="zoom" id="zoom" aria-label="Image">
+  <div class="zoom__stage" id="zoom-stage"><img id="zoom-img" alt=""></div>
+  <div class="zoom__bar">
+    <span class="zoom__cap" id="zoom-cap"></span>
+    <button type="button" id="zoom-prev" aria-label="Previous image">←</button>
+    <button type="button" id="zoom-next" aria-label="Next image">→</button>
+    <button type="button" id="zoom-size">Actual size</button>
+    <button type="button" id="zoom-close">Close ✕</button>
+  </div>
+</dialog>
 <dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
   <button class="sheet__close" type="button" id="sheet-close" aria-label="Close">Close ✕</button>
   <div class="sheet__body" id="sheet-body"></div>
