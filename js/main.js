@@ -1546,12 +1546,14 @@
         var op = depth > 0 ? 0.16 + 0.84 * depth * depth : 0.07 + 0.09 * (1 + depth);
         var blur = depth > 0 ? (1 - depth) * 3.5 : 3.5 + -depth * 2.5;
         if (gapK >= 0 && k !== gapK) { op *= 1 - 0.3 * gap; blur += gap * 0.5; }
+        var soon = !items[k % items.length].live; // not launched yet: kept too soft to read, and not pickable
+        if (soon) { blur += lineH * 0.2; op *= 0.8; } // scaled to the type, so it is as unreadable on a big screen as on a phone
         if (k === active) { op = opened ? 0 : 1; blur = 0; } // the name has become its preview
         n.style.opacity = op.toFixed(3);
         var b = Math.round(blur * 2) / 2;
         if (n._blur !== b) { n._blur = b; n.style.filter = b ? "blur(" + b + "px)" : "none"; }
         n.style.zIndex = String(200 + Math.round(depth * 100));
-        n.style.pointerEvents = depth > 0.5 && k !== active ? "auto" : "none";
+        n.style.pointerEvents = depth > 0.5 && k !== active && !soon ? "auto" : "none";
       }
     }
     // Opening is one movement on one clock: the wheel turns the chosen name to the middle, the
@@ -1686,7 +1688,8 @@
       n.setAttribute("role", "button");
       n.textContent = it.domain;
       if (k < items.length && it.image) { var pre = new Image(); pre.src = it.image; }
-      n.tabIndex = k >= items.length ? -1 : 0;
+      n.tabIndex = k >= items.length || !it.live ? -1 : 0;
+      if (!it.live) n.setAttribute("aria-hidden", "true");
       n.addEventListener("pointerdown", function (e) { lastPointer = e.pointerType; });
       // While the wheel is still turning nothing opens; whatever is under the pointer opens once it settles.
       n.addEventListener("pointerenter", function (e) { if (e.pointerType !== "mouse" || (e.clientX === mx && e.clientY === my)) return; hoverK = k; mx = e.clientX; my = e.clientY; if (!spinning && active < 0) setActive(k); }); // not when a name drifts under a resting pointer

@@ -927,15 +927,20 @@ main { flex: 1; min-height: 0; position: relative; }
   letter-spacing: -0.025em;
   text-wrap: balance;
 }
-#view-about .about__text { margin: 0.9em 0 2em; max-width: 34rem; font-size: 1.1rem; }
-.about__mail { font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 700; overflow-wrap: anywhere; }
+#view-about .about__text { margin: 0.9em 0 0; max-width: 36rem; font-size: 1.2rem; line-height: 1.45; }
+.about__block { margin-top: clamp(28px, 4vw, 48px); }
+.about__photo { margin: 0; }
+.about__contact { margin-top: clamp(40px, 7vw, 96px); padding-top: clamp(20px, 3vw, 36px); border-top: 1px solid var(--ink); }
+.about__mail { margin: 0.2em 0 0; font-size: clamp(1.5rem, 4.6vw, 3.6rem); font-weight: 800; letter-spacing: -0.035em; line-height: 1.05; overflow-wrap: anywhere; }
+.about__mail a { text-decoration: none; }
+.about__mail a:hover { color: var(--accent); }
 .about__links {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
-  margin-top: 14px;
+  gap: 8px 22px;
+  margin-top: 18px;
   font-family: var(--mono);
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 .about__photo img { display: block; width: 100%; height: auto; }
 .about__photo figcaption { margin-top: 6px; font-family: var(--mono); font-size: 0.72rem; color: var(--ink-soft); }
@@ -964,7 +969,9 @@ main { flex: 1; min-height: 0; position: relative; }
 .sheet__links { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 0; font-family: var(--mono); font-size: 0.85rem; }
 @media (max-width: 720px) {
   .about, .cols { grid-template-columns: minmax(0, 1fr); }
+  .about__side { display: contents; }
   .about__photo { order: -1; }
+  .about { display: flex; flex-direction: column; }
   .xrow { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .walk__doors { margin-top: 1em; }
   .walk__door { padding: 6px 0 7px; }

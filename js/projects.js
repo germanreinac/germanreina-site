@@ -46,8 +46,9 @@ window.SITE = {
   //   domain: what is shown in the list      url: where it goes ("" = not live yet)
   //   image:  a screenshot or GIF shown behind the list on hover, e.g. "images/play/name.jpg"
   //   tone:   background colour used until there is an image
+  //   live:   true once the site is launched. Entries without it stay on the wheel blurred and cannot be picked.
   play: [
-    { domain: "artdiscipline.com", url: "https://artdiscipline.com", note: "Newsletter site", image: "images/play/artdiscipline.jpg", tone: "#2b2631" },
+    { domain: "artdiscipline.com", url: "https://artdiscipline.com", note: "Newsletter site", image: "images/play/artdiscipline.jpg", tone: "#2b2631", live: true },
     { domain: "colorpoop.com", url: "http://www.colorpoop.com", note: "Colorpoop", image: "", tone: "#b9a2e6" },
     // Everything below is a stand-in so the staircase is long enough to scroll. Replace with real sites.
     { domain: "megalith interactive", url: "", note: "Stand-in", image: "", tone: "#7fa7a0" },
@@ -63,8 +64,8 @@ window.SITE = {
   ],
 
   about: {
-    lead: "Visual Artist and Art Director from Lanzarote.",
-    text: "Creative Vision & Worldbuilding for game and animation IPs. Creator of the art and visual style for OlliOlli World (BAFTA nominated). Worked with companies like Supercell, Riot Games, Psyop, Rovio, and more.",
+    lead: "Visual Artist from Lanzarote.",
+    text: "Creative Vision & Worldbuilding for video games. Creator of the art and visual style for OlliOlli World (BAFTA nominated).",
     photo: { src: "images/about/talk.jpg", alt: "Germán Reina speaking at Pictoplasma 2023", credit: "Photo: Diego Castro" },
     experience: [
       { who: "Supercell", when: "Nov 2024 – Present", what: "Concept Artist on Clash of Clans" },
