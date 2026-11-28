@@ -15,7 +15,7 @@ window.SITE = {
   // The line under the name. Other lines of yours that would fit here:
   //   "Stay creative, stay weird."   (germanreina.com, artdiscipline.com)
   //   "Creative Vision and Art Direction for Video Games and Animation."   (Notion bio)
-  intro: "Art Director from Lanzarote. Creator of the art for OlliOlli World. Artist at Supercell.",
+  intro: "Art Director from Lanzarote, currently at Supercell.\nCreator of the art for OlliOlli World.", // \n starts a new line
   nameHint: "who's this? ↓", // small line above the name on the home page; it and the name open About
   motto: "Stay creative, stay weird.",
   email: "germanrc3@hotmail.com",

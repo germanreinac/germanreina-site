@@ -1146,3 +1146,5 @@ main { flex: 1; min-height: 0; position: relative; }
 .zoom__cap { flex: 1; min-width: 10rem; }
 .zoom__bar button { padding: 5px 12px; border: 1px solid rgba(245, 245, 241, 0.5); border-radius: 999px; background: none; color: inherit; font: inherit; cursor: pointer; }
 .zoom__bar button:hover { border-color: var(--accent); color: var(--accent); }
+
+.hero .walk__intro p { white-space: pre-line; } /* the line under the name can be given as two lines */
