@@ -79,7 +79,10 @@
   }
   function burst(node) {
     if (reduceMotion || !node) return;
-    node.setAttribute("data-text", node.textContent);
+    // only the heading's own words are glitched, not anything written into it later (the name after "Play")
+    var own = "";
+    for (var c = node.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) own += c.nodeValue;
+    node.setAttribute("data-text", own.trim() || node.textContent);
     node.classList.remove("is-glitching");
     void node.offsetWidth; // restart the animation
     node.classList.add("is-glitching");
@@ -1613,7 +1616,11 @@
       view.classList.toggle("has-active", k >= 0);
       if (k < 0) { // close: the thumbnail fades and the neighbours come back together
         opened = false;
-        if (nowEl) nowEl.classList.remove("is-on");
+        if (nowEl) {
+          nowEl.classList.remove("is-on");
+          clearTimeout(nowEl._t);
+          nowEl._t = setTimeout(function () { if (active < 0) nowEl.textContent = ""; }, 260); // gone once it has faded
+        }
         clearTimeout(goT);
         go.removeAttribute("href");
         tw = { t0: pickedAt, d: CLOSE, g0: gap, g1: 0 };
@@ -1725,13 +1732,14 @@
       list.style.fontSize = size + "px";
       list.style.perspective = Math.round(R * 4.2) + "px";
       list.style.perspectiveOrigin = ax + "px " + ay + "px";
-      if (nowEl) nowEl.style.fontSize = size + "px";              // the name after "Play" is the size it has on the wheel
+      if (nowEl) nowEl.style.fontSize = (size * 0.5) + "px";      // the name after "Play" is half the size it has on the wheel
       spread = Math.max(0, frame.offsetWidth * 0.3125 - lineH * 0.3); // the name before ends up just above the thumbnail, the name after just below its caption
       layout();
       kick();
     }
     footer(document.getElementById("play-foot"), true);
     window.__playShown = fit;
+    window.addEventListener("route", function () { if (view.hidden && active >= 0) { setActive(-1); if (nowEl) nowEl.textContent = ""; } }); // leaving Play closes its preview
     window.addEventListener("resize", fit);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 
