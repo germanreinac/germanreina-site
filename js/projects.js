@@ -39,7 +39,7 @@ window.SITE = {
     { label: "LinkedIn", url: "https://www.linkedin.com/in/germ%C3%A1n-reina-carmona-a2627560/" },
     { label: "Art Discipline", url: "https://artdiscipline.com" },
     { label: "Photoshop Toolkit", url: "https://germanreinac.gumroad.com/l/photoshoptools" },
-    { label: "Mentorship", url: "https://germanreinac.gumroad.com/" }
+    { label: "Mentorship", url: "https://germanreinac.gumroad.com/l/cldiu" } // the 1-on-1 Mentorship Session product
   ],
 
   // The Play page: interactive sites and games. One line each.
